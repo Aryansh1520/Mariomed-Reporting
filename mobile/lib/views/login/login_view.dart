@@ -29,7 +29,7 @@ class LoginView extends GetView<LoginController> {
     );
   }
 
-  /// The hero sits at the top. The card is centred in the space below it, so it cannot climb over the logo.
+  /// The hero sits at the top and the card is centred on the whole screen, so the card's centre is the screen's centre.
   Widget _stackedLayout(BuildContext context, ScreenSize size) {
     final gutter = AppLayout.gutter(size);
     // Home's hero is about half the screen and fades into the page at its bottom edge; the login hero matches that.
@@ -44,20 +44,14 @@ class LoginView extends GetView<LoginController> {
           height: heroHeight,
           child: const _Brand(),
         ),
-        Positioned(
-          left: 0,
-          right: 0,
-          top: heroHeight,
-          bottom: 0,
-          child: Center(
-            child: Padding(
-              padding: EdgeInsets.all(gutter),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(
-                  maxWidth: AppLayout.formMaxWidth,
-                ),
-                child: _SignInCard(controller: controller),
+        Center(
+          child: Padding(
+            padding: EdgeInsets.all(gutter),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: AppLayout.formMaxWidth,
               ),
+              child: _SignInCard(controller: controller),
             ),
           ),
         ),
