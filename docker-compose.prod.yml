@@ -5,7 +5,8 @@ name: field-sales-prod
 
 services:
   db:
-    image: postgis/postgis:16-3.4
+    # Multi-arch PostGIS build. The official postgis/postgis tag has no arm64 image, and the server is arm64.
+    image: imresamu/postgis:16-3.4
     env_file: .env
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
