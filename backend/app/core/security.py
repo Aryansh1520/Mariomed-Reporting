@@ -50,6 +50,10 @@ def new_token() -> str:
     return secrets.token_urlsafe(32)
 
 
+def new_reset_code() -> str:
+    return f"{secrets.randbelow(10**6):06d}"
+
+
 def hash_token(token: str) -> str:
     """Only the hash is stored, so a leaked database does not leak live sessions or reset links."""
     return hashlib.sha256(token.encode()).hexdigest()

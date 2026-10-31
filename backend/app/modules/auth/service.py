@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.exceptions import BadRequest, Unauthorized
 from app.core.mailer import MailError, get_mailer
-from app.core.security import hash_token, new_token
+from app.core.security import hash_token, new_reset_code, new_token
 from app.modules.auth import repository
 from app.modules.auth.models import AuthSession, PasswordResetToken
 from app.modules.auth.schemas import CurrentUserRead, LoginRequest, LoginResponse, PermissionRead
@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 SESSION_ENDED = "Your session has ended. Sign in again."
 RESET_CODE_INVALID = "This reset code is invalid or has expired. Request a new one."
+MAX_RESET_ATTEMPTS = 5
 
 
 def login(db: Session, body: LoginRequest) -> LoginResponse:
@@ -90,30 +91,35 @@ def request_password_reset(db: Session, identifier: str) -> None:
     if user is None or not user.is_active:
         return
 
-    token = new_token()
-    expires_at = datetime.now(UTC) + timedelta(minutes=settings.password_reset_minutes)
+    code = new_reset_code()
+    now = datetime.now(UTC)
+    repository.void_open_reset_tokens(db, user.id, now)
     repository.add_reset_token(
         db,
         PasswordResetToken(
             user_id=user.id,
-            token_hash=hash_token(token),
-            expires_at=expires_at,
+            token_hash=hash_token(code),
+            expires_at=now + timedelta(minutes=settings.password_reset_minutes),
             created_by=user.id,
             updated_by=user.id,
         ),
     )
     db.commit()
-    _send_reset_email(user, token)
+    _send_reset_email(user, code)
 
 
-def confirm_password_reset(db: Session, token: str, new_password: str) -> None:
-    reset = repository.get_reset_token_by_hash(db, hash_token(token))
-    now = datetime.now(UTC)
-    if reset is None or reset.used_at is not None or reset.expires_at <= now:
+def confirm_password_reset(db: Session, identifier: str, code: str, new_password: str) -> None:
+    user = users_service.find_by_identifier(db, identifier)
+    if user is None or not user.is_active:
         raise BadRequest(RESET_CODE_INVALID)
 
-    user = users_service.get_by_id(db, reset.user_id)
-    if user is None or not user.is_active:
+    now = datetime.now(UTC)
+    reset = repository.get_open_reset_token(db, user.id, now)
+    if reset is None or reset.failed_attempts >= MAX_RESET_ATTEMPTS:
+        raise BadRequest(RESET_CODE_INVALID)
+    if reset.token_hash != hash_token(code):
+        reset.failed_attempts += 1
+        db.commit()
         raise BadRequest(RESET_CODE_INVALID)
 
     users_service.set_password(user, new_password)
@@ -122,19 +128,20 @@ def confirm_password_reset(db: Session, token: str, new_password: str) -> None:
     db.commit()
 
 
-def _send_reset_email(user: User, token: str) -> None:
+def _send_reset_email(user: User, code: str) -> None:
     body = (
         f"Hi {user.full_name},\n\n"
-        "To choose a new password, open the My Mariomed app, tap Forgot password, "
-        "and enter this reset code:\n\n"
-        f"{token}\n\n"
-        f"The code expires in {settings.password_reset_minutes} minutes and works once.\n\n"
+        "Your password reset code is:\n\n"
+        f"{code}\n\n"
+        "Enter it in the My Mariomed app with your new password. "
+        f"The code expires in {settings.password_reset_minutes} minutes, works once, "
+        f"and stops working after {MAX_RESET_ATTEMPTS} wrong entries.\n\n"
         "If you did not ask for this, you can ignore this email."
     )
     try:
-        get_mailer().send(user.email, "Reset your password", body)
+        get_mailer().send(user.email, "Your password reset code", body)
     except MailError:
-        # The reset row is already saved, so the user can request again. The reason is logged without the body.
+        # The code row is already saved, so the user can request again. The reason is logged without the body.
         logger.error("Password reset email could not be sent.")
 
 

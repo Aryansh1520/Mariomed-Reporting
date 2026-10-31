@@ -50,4 +50,4 @@ def confirm_password_reset(
     body: PasswordResetConfirm,
     db: Session = Depends(get_db),
 ) -> None:
-    service.confirm_password_reset(db, body.token, body.new_password)
+    service.confirm_password_reset(db, body.identifier, body.code, body.new_password)

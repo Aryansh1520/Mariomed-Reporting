@@ -45,7 +45,7 @@ class LoginController extends GetxController {
     }
     try {
       await _authService.sendPasswordReset(id);
-      Get.toNamed(AppRoutes.passwordReset);
+      Get.toNamed(AppRoutes.passwordReset, arguments: id);
     } on AppException catch (e) {
       errorMessage.value = e.message;
     }

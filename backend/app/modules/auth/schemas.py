@@ -37,5 +37,6 @@ class PasswordResetRequest(BaseModel):
 
 
 class PasswordResetConfirm(BaseModel):
-    token: str = Field(min_length=20, max_length=128)
+    identifier: str = Field(min_length=3, max_length=254, description="Mobile number or email")
+    code: str = Field(pattern=r"^\d{6}$", description="Six-digit code from the reset email")
     new_password: str = Field(min_length=8, max_length=256)

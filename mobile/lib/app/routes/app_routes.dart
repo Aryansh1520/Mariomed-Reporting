@@ -1,7 +1,7 @@
 abstract class AppRoutes {
   static const login = '/login';
 
-  /// Sets a new password with the code from the reset email.
+  /// Enters the six-digit code from the reset email and a new password. The mobile or email is the route argument.
   static const passwordReset = '/login/reset';
 
   /// The signed-in landing screen: the bottom tabs.

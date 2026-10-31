@@ -78,14 +78,19 @@ class AuthService {
     authenticated: false,
   );
 
-  /// Sets a new password with the code from the reset email. The server ends every open session for the account.
+  /// Sets a new password with the six-digit code from the reset email. The server ends every open session for the account.
   Future<void> confirmPasswordReset({
+    required String identifier,
     required String code,
     required String newPassword,
   }) => _api.postData<void>(
     '/auth/password-reset/confirm',
     (_) {},
-    body: {'token': code.trim(), 'new_password': newPassword},
+    body: {
+      'identifier': identifier.trim(),
+      'code': code.trim(),
+      'new_password': newPassword,
+    },
     authenticated: false,
   );
 

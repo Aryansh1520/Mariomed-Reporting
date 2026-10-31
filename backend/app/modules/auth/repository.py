@@ -46,7 +46,23 @@ def add_reset_token(db: Session, token: PasswordResetToken) -> PasswordResetToke
     return token
 
 
-def get_reset_token_by_hash(db: Session, token_hash: str) -> PasswordResetToken | None:
+def get_open_reset_token(db: Session, user_id: int, now: datetime) -> PasswordResetToken | None:
+    """The newest code that is unused and not expired. Older codes were voided when it was issued."""
     return db.scalar(
-        select(PasswordResetToken).where(PasswordResetToken.token_hash == token_hash)
+        select(PasswordResetToken)
+        .where(
+            PasswordResetToken.user_id == user_id,
+            PasswordResetToken.used_at.is_(None),
+            PasswordResetToken.expires_at > now,
+        )
+        .order_by(PasswordResetToken.id.desc())
+        .limit(1)
+    )
+
+
+def void_open_reset_tokens(db: Session, user_id: int, now: datetime) -> None:
+    db.execute(
+        update(PasswordResetToken)
+        .where(PasswordResetToken.user_id == user_id, PasswordResetToken.used_at.is_(None))
+        .values(used_at=now)
     )

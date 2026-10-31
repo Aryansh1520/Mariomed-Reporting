@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 
@@ -47,18 +48,31 @@ class ResetPasswordView extends GetView<ResetPasswordController> {
                   ),
                   const SizedBox(height: AppSpace.xs),
                   Text(
-                    'If an account exists for the address you entered, a reset code has been emailed to it. '
-                    'The code works once and expires after 30 minutes.',
+                    'If an account exists for this address, a six-digit code has been emailed to it. '
+                    'It works once and expires after 15 minutes.',
                     style: text.bodyMedium?.copyWith(color: p.inkMuted),
                   ),
                   const SizedBox(height: AppSpace.xl),
                   TextField(
-                    controller: controller.code,
+                    controller: controller.identifier,
+                    keyboardType: TextInputType.emailAddress,
                     textInputAction: TextInputAction.next,
-                    autocorrect: false,
-                    enableSuggestions: false,
                     decoration: const InputDecoration(
-                      labelText: 'Reset code',
+                      labelText: 'Mobile or email',
+                      prefixIcon: Icon(Iconsax.user),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpace.m),
+                  TextField(
+                    controller: controller.code,
+                    keyboardType: TextInputType.number,
+                    textInputAction: TextInputAction.next,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(6),
+                    ],
+                    decoration: const InputDecoration(
+                      labelText: 'Six-digit code',
                       prefixIcon: Icon(Iconsax.key),
                     ),
                   ),

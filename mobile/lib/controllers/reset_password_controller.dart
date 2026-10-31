@@ -10,6 +10,7 @@ class ResetPasswordController extends GetxController {
   ResetPasswordController(this._authService);
 
   final AuthService _authService;
+  final identifier = TextEditingController(text: Get.arguments as String?);
   final code = TextEditingController();
   final password = TextEditingController();
   final confirmPassword = TextEditingController();
@@ -26,6 +27,7 @@ class ResetPasswordController extends GetxController {
     errorMessage.value = null;
     try {
       await _authService.confirmPasswordReset(
+        identifier: identifier.text,
         code: code.text,
         newPassword: password.text,
       );
@@ -42,7 +44,10 @@ class ResetPasswordController extends GetxController {
   }
 
   String? _problem() {
-    if (code.text.trim().isEmpty) return 'Enter the reset code from your email.';
+    if (identifier.text.trim().isEmpty) return 'Enter your mobile or email.';
+    if (!RegExp(r'^\d{6}$').hasMatch(code.text.trim())) {
+      return 'Enter the six-digit code from your email.';
+    }
     if (password.text.length < 8) {
       return 'Use at least 8 characters for the new password.';
     }
@@ -54,6 +59,7 @@ class ResetPasswordController extends GetxController {
 
   @override
   void onClose() {
+    identifier.dispose();
     code.dispose();
     password.dispose();
     confirmPassword.dispose();

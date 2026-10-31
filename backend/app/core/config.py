@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     # A rep may report a day until this many days after it, after which the day is locked as missed.
     reporting_grace_days: int = 4
 
-    password_reset_minutes: int = 30
+    password_reset_minutes: int = 15
 
 
 settings = Settings()
