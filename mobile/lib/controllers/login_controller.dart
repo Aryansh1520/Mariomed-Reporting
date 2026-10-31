@@ -2,7 +2,6 @@ import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 
 import '../app/routes/app_routes.dart';
-import '../core/widgets/app_dialogs.dart';
 import '../services/app_exception.dart';
 import '../services/auth_service.dart';
 
@@ -46,10 +45,7 @@ class LoginController extends GetxController {
     }
     try {
       await _authService.sendPasswordReset(id);
-      await AppDialogs.info(
-        'Check your email',
-        'If an account exists for this address, a reset link is on its way.',
-      );
+      Get.toNamed(AppRoutes.passwordReset);
     } on AppException catch (e) {
       errorMessage.value = e.message;
     }

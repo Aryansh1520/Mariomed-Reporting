@@ -78,6 +78,17 @@ class AuthService {
     authenticated: false,
   );
 
+  /// Sets a new password with the code from the reset email. The server ends every open session for the account.
+  Future<void> confirmPasswordReset({
+    required String code,
+    required String newPassword,
+  }) => _api.postData<void>(
+    '/auth/password-reset/confirm',
+    (_) {},
+    body: {'token': code.trim(), 'new_password': newPassword},
+    authenticated: false,
+  );
+
   /// Reloads the signed-in user's permissions, so a role change made elsewhere takes effect without signing in again.
   Future<void> refreshCurrentUser() async {
     await _fetchCurrentUser();

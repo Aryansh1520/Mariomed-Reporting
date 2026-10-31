@@ -2,12 +2,14 @@ import 'package:get/get.dart';
 
 import '../../core/widgets/app_page_transition.dart';
 import '../../views/login/login_view.dart';
+import '../../views/login/reset_password_view.dart';
 import '../../views/products/product_form_view.dart';
 import '../../views/contacts/categories_view.dart';
 import '../../views/products/products_view.dart';
 import '../../views/territories/territory_contacts_view.dart';
 import '../../views/shell/main_shell_view.dart';
 import '../bindings/login_binding.dart';
+import '../bindings/reset_password_binding.dart';
 import '../bindings/categories_binding.dart';
 import '../bindings/products_binding.dart';
 import '../bindings/territory_contacts_binding.dart';
@@ -30,6 +32,13 @@ abstract class AppPages {
       middlewares: [GuestGuard()],
       page: () => const LoginView(),
       binding: LoginBinding(),
+      customTransition: _transition,
+    ),
+    GetPage(
+      name: AppRoutes.passwordReset,
+      middlewares: [GuestGuard()],
+      page: () => const ResetPasswordView(),
+      binding: ResetPasswordBinding(),
       customTransition: _transition,
     ),
     GetPage(

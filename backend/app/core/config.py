@@ -30,8 +30,6 @@ class Settings(BaseSettings):
     reporting_grace_days: int = 4
 
     password_reset_minutes: int = 30
-    # Where the emailed link leads. The web admin panel will host the reset page.
-    password_reset_url: str = "http://localhost:3000/reset-password"
 
 
 settings = Settings()

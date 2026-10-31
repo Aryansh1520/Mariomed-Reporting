@@ -18,7 +18,7 @@ from app.modules.users.models import User
 logger = logging.getLogger(__name__)
 
 SESSION_ENDED = "Your session has ended. Sign in again."
-RESET_LINK_INVALID = "This reset link is invalid or has expired. Request a new one."
+RESET_CODE_INVALID = "This reset code is invalid or has expired. Request a new one."
 
 
 def login(db: Session, body: LoginRequest) -> LoginResponse:
@@ -110,11 +110,11 @@ def confirm_password_reset(db: Session, token: str, new_password: str) -> None:
     reset = repository.get_reset_token_by_hash(db, hash_token(token))
     now = datetime.now(UTC)
     if reset is None or reset.used_at is not None or reset.expires_at <= now:
-        raise BadRequest(RESET_LINK_INVALID)
+        raise BadRequest(RESET_CODE_INVALID)
 
     user = users_service.get_by_id(db, reset.user_id)
     if user is None or not user.is_active:
-        raise BadRequest(RESET_LINK_INVALID)
+        raise BadRequest(RESET_CODE_INVALID)
 
     users_service.set_password(user, new_password)
     reset.used_at = now
@@ -123,12 +123,12 @@ def confirm_password_reset(db: Session, token: str, new_password: str) -> None:
 
 
 def _send_reset_email(user: User, token: str) -> None:
-    link = f"{settings.password_reset_url}?token={token}"
     body = (
         f"Hi {user.full_name},\n\n"
-        "Use this link to choose a new password. "
-        f"It expires in {settings.password_reset_minutes} minutes.\n\n"
-        f"{link}\n\n"
+        "To choose a new password, open the My Mariomed app, tap Forgot password, "
+        "and enter this reset code:\n\n"
+        f"{token}\n\n"
+        f"The code expires in {settings.password_reset_minutes} minutes and works once.\n\n"
         "If you did not ask for this, you can ignore this email."
     )
     try:

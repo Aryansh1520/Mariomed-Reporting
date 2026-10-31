@@ -1,6 +1,9 @@
 abstract class AppRoutes {
   static const login = '/login';
 
+  /// Sets a new password with the code from the reset email.
+  static const passwordReset = '/login/reset';
+
   /// The signed-in landing screen: the bottom tabs.
   static const home = '/app';
 
