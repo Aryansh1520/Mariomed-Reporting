@@ -1,0 +1,13 @@
+# Secrets: only .env.example is committed
+.env
+.env.*
+!.env.example
+
+# Local tooling
+.claude/settings.local.json
+.idea/
+.vscode/
+.DS_Store
+__pycache__/
+*.pyc
+.venv/

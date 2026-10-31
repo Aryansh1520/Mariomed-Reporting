@@ -1,0 +1,38 @@
+name: field-sales
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-fs}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fs_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-field_sales}
+    ports:
+      - "${DB_HOST_PORT:-5452}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fs} -d ${POSTGRES_DB:-field_sales}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-fs}:${POSTGRES_PASSWORD:-fs_dev_password}@db:5432/${POSTGRES_DB:-field_sales}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+    ports:
+      - "${API_HOST_PORT:-8200}:8000"
+    volumes:
+      # Dev only: live-reload on code changes. Remove for production images.
+      - ./backend/app:/app/app
+      - ./backend/migrations:/app/migrations
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:
