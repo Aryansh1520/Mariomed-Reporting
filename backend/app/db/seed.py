@@ -1,4 +1,4 @@
-"""Creates the permission catalogue, the admin role, an example field role and demo accounts. Safe to run again.
+"""Creates the permission catalogue, the admin role, an example sales representative role and demo accounts. Safe to run again.
 
 Run from the backend folder: python -m app.db.seed
 Roles go through the same role service the admin uses. Only the admin role is locked.
