@@ -29,30 +29,34 @@ class LoginView extends GetView<LoginController> {
     );
   }
 
-  /// The hero takes a fixed share of the height at the top. The card sits in the space below it and scrolls,
-  /// so it never climbs over the logo on short screens or when the keyboard is open.
+  /// The hero sits at the top. The card is centred in the space below it, so it cannot climb over the logo.
   Widget _stackedLayout(BuildContext context, ScreenSize size) {
     final gutter = AppLayout.gutter(size);
+    // Home's hero is about half the screen and fades into the page at its bottom edge; the login hero matches that.
     final heroHeight = MediaQuery.sizeOf(context).height * 0.5;
-    return Column(
+    return Stack(
+      fit: StackFit.expand,
       children: [
-        SizedBox(height: heroHeight, child: const _Brand()),
-        Expanded(
-          child: LayoutBuilder(
-            builder: (context, constraints) => SingleChildScrollView(
+        Positioned(
+          left: 0,
+          right: 0,
+          top: 0,
+          height: heroHeight,
+          child: const _Brand(),
+        ),
+        Positioned(
+          left: 0,
+          right: 0,
+          top: heroHeight,
+          bottom: 0,
+          child: Center(
+            child: Padding(
               padding: EdgeInsets.all(gutter),
               child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  minHeight: constraints.maxHeight - gutter * 2,
+                constraints: const BoxConstraints(
+                  maxWidth: AppLayout.formMaxWidth,
                 ),
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(
-                      maxWidth: AppLayout.formMaxWidth,
-                    ),
-                    child: _SignInCard(controller: controller),
-                  ),
-                ),
+                child: _SignInCard(controller: controller),
               ),
             ),
           ),
