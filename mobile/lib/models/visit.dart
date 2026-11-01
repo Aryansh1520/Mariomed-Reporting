@@ -26,6 +26,7 @@ class VisitRecord {
     required this.contactId,
     required this.contactName,
     required this.categoryName,
+    this.typeName,
     required this.zoneId,
     required this.zoneName,
     required this.subzoneId,
@@ -47,6 +48,7 @@ class VisitRecord {
     contactId: json['contact_id'] as int,
     contactName: json['contact_name'] as String,
     categoryName: json['category_name'] as String,
+    typeName: json['type_name'] as String?,
     zoneId: json['zone_id'] as int,
     zoneName: json['zone_name'] as String,
     subzoneId: json['subzone_id'] as int,
@@ -74,6 +76,7 @@ class VisitRecord {
   final int contactId;
   final String contactName;
   final String categoryName;
+  final String? typeName;
   final int zoneId;
   final String zoneName;
   final int subzoneId;
@@ -94,6 +97,7 @@ class VisitRecord {
     id: contactId,
     name: contactName,
     categoryName: categoryName,
+    typeName: typeName,
     zoneId: zoneId,
     zoneName: zoneName,
     subzoneId: subzoneId,
@@ -144,6 +148,7 @@ class JointRequest {
     required this.visitTime,
     required this.contactName,
     required this.categoryName,
+    this.typeName,
     required this.zoneName,
     required this.subzoneName,
     required this.remarks,
@@ -159,6 +164,7 @@ class JointRequest {
     visitTime: json['visit_time'] as String,
     contactName: json['contact_name'] as String,
     categoryName: json['category_name'] as String,
+    typeName: json['type_name'] as String?,
     zoneName: json['zone_name'] as String,
     subzoneName: json['subzone_name'] as String,
     remarks: json['remarks'] as String,
@@ -176,6 +182,7 @@ class JointRequest {
   final String visitTime;
   final String contactName;
   final String categoryName;
+  final String? typeName;
   final String zoneName;
   final String subzoneName;
   final String remarks;

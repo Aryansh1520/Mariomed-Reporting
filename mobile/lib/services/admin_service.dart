@@ -1,5 +1,6 @@
 import '../models/role.dart';
 import '../models/team_user.dart';
+import '../models/territory.dart';
 import 'api_service.dart';
 
 /// Team and role endpoints. Each call needs the matching permission, and the server checks it.
@@ -41,6 +42,29 @@ class AdminService {
         '/users/$userId/activation',
         (_) {},
         body: {'is_active': isActive},
+      );
+
+  Future<List<Territory>> listTerritories() =>
+      _api.getData<List<Territory>>('/territories/map', (data) {
+        final items = ApiService.asJsonMap(data)['territories'] as List<Object?>;
+        return [
+          for (final item in items)
+            Territory.fromJson(ApiService.asJsonMap(item)),
+        ];
+      });
+
+  Future<List<int>> listUserTerritoryIds(int userId) =>
+      _api.getData<List<int>>('/territories/users/$userId', (data) {
+        final ids = ApiService.asJsonMap(data)['territory_ids'] as List<Object?>;
+        return [for (final id in ids) id as int];
+      });
+
+  /// Replaces the whole list: the zones and subzones not sent are taken away.
+  Future<void> setUserTerritoryIds(int userId, List<int> territoryIds) =>
+      _api.putData<void>(
+        '/territories/users/$userId',
+        (_) {},
+        body: {'territory_ids': territoryIds},
       );
 
   Future<List<Role>> listRoles() => _api.getData<List<Role>>('/roles', (data) {

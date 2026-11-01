@@ -16,6 +16,7 @@ import '../../models/contact.dart';
 import '../admin/team_day_view.dart';
 import '../../models/team_dashboard.dart';
 import '../../services/auth_service.dart';
+import 'category_types_view.dart';
 
 /// Contact categories: doctors, chemists, stockists and the rest. Managers can add, rename and switch them off.
 class CategoriesView extends GetView<CategoriesController> {
@@ -90,6 +91,9 @@ class CategoriesView extends GetView<CategoriesController> {
                   canManage: canManage,
                   onEdit: () => _rename(category),
                   onToggle: () => _toggleActive(category),
+                  onTypes: () => Get.to(
+                    () => CategoryTypesView(category: category),
+                  ),
                 ),
             ],
           ),
@@ -208,6 +212,7 @@ class _CategoryRow extends StatelessWidget {
     required this.canManage,
     required this.onEdit,
     required this.onToggle,
+    required this.onTypes,
   });
 
   final ContactCategory category;
@@ -217,6 +222,7 @@ class _CategoryRow extends StatelessWidget {
   final bool canManage;
   final VoidCallback onEdit;
   final VoidCallback onToggle;
+  final VoidCallback onTypes;
 
   @override
   Widget build(BuildContext context) {
@@ -296,6 +302,7 @@ class _CategoryRow extends StatelessWidget {
                         active: active,
                         onEdit: onEdit,
                         onToggle: onToggle,
+                        onTypes: onTypes,
                       ),
                     ],
                   ],

@@ -75,6 +75,7 @@ def member_detail(db: Session, principal: Principal, user_id: int, start: date, 
             visit_time=visit.visit_time,
             contact_name=visit.contact_name,
             category_name=visit.category_name,
+            type_name=visit.type_name,
             products=[product.name for product in visit.products],
             remarks=visit.remarks,
             status=visit.status,
@@ -144,6 +145,7 @@ def team_missed(
         MissedContactLine(
             contact_name=contact.name,
             category_name=contact.category_name,
+            type_name=contact.type_name,
             zone_name=places[contact.subzone_id].zone_name,
         )
         for contact in contacts
@@ -187,6 +189,7 @@ def team_calls(
                 rep_name=names[visit.user_id],
                 contact_name=visit.contact_name,
                 category_name=visit.category_name,
+                type_name=visit.type_name,
                 zone_name=visit.zone_name,
                 products=[product.name for product in visit.products],
                 status=visit.status,

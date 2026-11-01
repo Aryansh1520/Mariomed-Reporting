@@ -19,6 +19,7 @@ from app.modules.users.schemas import TeamUserCreate, TeamUserRead, TeamUserUpda
 INVALID_CREDENTIALS = "Mobile, email or password is incorrect."
 TEAM_USER_NOT_FOUND = "This user does not exist."
 ROLE_NOT_ASSIGNABLE = "This role does not exist."
+ADMIN_LOCKED = "The administrator account cannot be switched off."
 EMAIL_OR_MOBILE_TAKEN = "A user with this email or mobile already exists."
 
 # Checked when the identifier matches no user, so unknown and wrong-password logins take the same time.
@@ -159,6 +160,8 @@ def set_team_user_active(
     user = _team_user(db, principal, user_id, Perm.USERS_MANAGE)
     if not is_active and user.id == principal.user_id:
         raise BadRequest("You cannot deactivate your own account.")
+    if not is_active and rbac_service.roles_by_id(db)[user.role_id].is_locked:
+        raise BadRequest(ADMIN_LOCKED)
     user.is_active = is_active
     user.updated_by = principal.user_id
     db.commit()

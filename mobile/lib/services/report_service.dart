@@ -72,7 +72,7 @@ class ReportService {
             for (final item in planned)
               ReportRow(
                 title: item.contactName,
-                subtitle: '${item.categoryName}  ·  ${item.subzoneName}',
+                subtitle: '${contactKind(item.categoryName, item.typeName)}  ·  ${item.subzoneName}',
                 trailing: _planLabel(item.status),
                 tone: _planTone(item.status),
               ),
@@ -280,7 +280,7 @@ class ReportService {
                 ReportRow(
                   title: item.contactName,
                   subtitle:
-                      '${item.categoryName}  ·  ${item.zoneName} › ${item.subzoneName}',
+                      '${contactKind(item.categoryName, item.typeName)}  ·  ${item.zoneName} › ${item.subzoneName}',
                   trailing: _planLabel(item.status),
                   tone: _planTone(item.status),
                 ),
@@ -384,13 +384,13 @@ class ReportService {
     title: visit.contactName,
     subtitle:
         '${_time(visit.visitTime)}  ·  ${visit.repName}  ·  ${visit.products.map((product) => product.name).join(', ')}',
-    trailing: visit.categoryName,
+    trailing: contactKind(visit.categoryName, visit.typeName),
   );
 
   static ReportRow _contactRow(Contact contact, RowTone tone) => ReportRow(
     title: contact.name,
     subtitle:
-        '${contact.categoryName}  ·  ${contact.zoneName} › ${contact.subzoneName}',
+        '${contactKind(contact.categoryName, contact.typeName)}  ·  ${contact.zoneName} › ${contact.subzoneName}',
     tone: tone,
     contactId: contact.id,
   );

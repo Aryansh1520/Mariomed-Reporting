@@ -4,7 +4,7 @@ from app.core.exceptions import BadRequest, Conflict, Forbidden, NotFound
 from app.core.pagination import Page
 from app.modules.audit import service as audit
 from app.modules.contacts import repository
-from app.modules.contacts.models import Contact, ContactCategory
+from app.modules.contacts.models import Contact, ContactCategory, ContactType
 from app.modules.contacts.schemas import (
     CategoryCreate,
     CategoryRead,
@@ -14,6 +14,10 @@ from app.modules.contacts.schemas import (
     ContactRead,
     ContactRef,
     ContactUpdate,
+    TypeCreate,
+    TypeListQuery,
+    TypeRead,
+    TypeUpdate,
 )
 from app.modules.rbac import service as rbac_service
 from app.modules.rbac.catalog import Perm
@@ -23,6 +27,10 @@ from app.modules.territories import service as territories_service
 CATEGORY_NOT_FOUND = "This category does not exist."
 CATEGORY_TAKEN = "A category with this name already exists."
 CATEGORY_INACTIVE = "This category is switched off. Choose an active category."
+TYPE_NOT_FOUND = "This type does not exist."
+TYPE_TAKEN = "A type with this name already exists in this category."
+TYPE_INACTIVE = "This type is switched off. Choose an active type."
+TYPE_OTHER_CATEGORY = "This type belongs to another category."
 CONTACT_NOT_FOUND = "This contact does not exist."
 CONTACT_INACTIVE = "This contact is switched off and cannot be visited."
 SUBZONE_NOT_FOUND = "Choose a subzone for this contact."
@@ -45,6 +53,60 @@ def create_category(db: Session, principal: Principal, data: CategoryCreate) -> 
     audit.record(db, principal.user_id, "contact_category.create", "contact_category", category.id)
     db.commit()
     return CategoryRead.model_validate(category)
+
+
+def list_types(db: Session, principal: Principal, query: TypeListQuery) -> Page[TypeRead]:
+    rbac_service.require_scope(principal, Perm.CONTACTS_READ)
+    rows, total = repository.list_types_page(db, query)
+    return Page[TypeRead](
+        items=[TypeRead.model_validate(row) for row in rows],
+        total=total,
+        page=query.page,
+        page_size=query.page_size,
+    )
+
+
+def create_type(db: Session, principal: Principal, data: TypeCreate) -> TypeRead:
+    rbac_service.require_scope(principal, Perm.SETTINGS_MANAGE)
+    _ensure_category_exists(db, data.category_id)
+    if repository.get_type_by_name(db, data.category_id, data.name) is not None:
+        raise Conflict(TYPE_TAKEN)
+    contact_type = repository.add(
+        db,
+        ContactType(
+            category_id=data.category_id,
+            name=data.name,
+            is_active=True,
+            created_by=principal.user_id,
+            updated_by=principal.user_id,
+        ),
+    )
+    audit.record(db, principal.user_id, "contact_type.create", "contact_type", contact_type.id)
+    db.commit()
+    return TypeRead.model_validate(contact_type)
+
+
+def update_type(db: Session, principal: Principal, type_id: int, data: TypeUpdate) -> TypeRead:
+    rbac_service.require_scope(principal, Perm.SETTINGS_MANAGE)
+    contact_type = repository.get_type(db, type_id)
+    if contact_type is None:
+        raise NotFound(TYPE_NOT_FOUND)
+    if data.name is not None:
+        existing = repository.get_type_by_name(db, contact_type.category_id, data.name)
+        if existing is not None and existing.id != contact_type.id:
+            raise Conflict(TYPE_TAKEN)
+        contact_type.name = data.name
+    if data.is_active is not None:
+        contact_type.is_active = data.is_active
+    contact_type.updated_by = principal.user_id
+    audit.record(db, principal.user_id, "contact_type.update", "contact_type", contact_type.id)
+    db.commit()
+    return TypeRead.model_validate(contact_type)
+
+
+def ensure_category(db: Session, name: str) -> None:
+    if repository.get_category_by_name(db, name) is None:
+        repository.add(db, ContactCategory(name=name, is_active=True))
 
 
 def update_category(db: Session, principal: Principal, category_id: int, data: CategoryUpdate) -> CategoryRead:
@@ -80,12 +142,15 @@ def list_contacts(db: Session, principal: Principal, query: ContactListQuery) ->
 def create_contact(db: Session, principal: Principal, data: ContactCreate) -> ContactRead:
     rbac_service.require_scope(principal, Perm.CONTACTS_MANAGE)
     _ensure_category_active(db, data.category_id)
+    if data.type_id is not None:
+        _ensure_type_fits(db, data.type_id, data.category_id)
     _ensure_subzone_visible(db, principal, data.subzone_id, Perm.CONTACTS_MANAGE)
     contact = repository.add(
         db,
         Contact(
             name=data.name,
             category_id=data.category_id,
+            type_id=data.type_id,
             subzone_id=data.subzone_id,
             is_active=True,
             created_by=principal.user_id,
@@ -100,9 +165,12 @@ def create_contact(db: Session, principal: Principal, data: ContactCreate) -> Co
 def update_contact(db: Session, principal: Principal, contact_id: int, data: ContactUpdate) -> ContactRead:
     rbac_service.require_scope(principal, Perm.CONTACTS_MANAGE)
     contact = _manageable_contact(db, principal, contact_id)
+    category_changed = data.category_id is not None and data.category_id != contact.category_id
     if data.category_id is not None:
         _ensure_category_active(db, data.category_id)
         contact.category_id = data.category_id
+    if "type_id" in data.model_fields_set or category_changed:
+        _set_type(db, contact, data.type_id if "type_id" in data.model_fields_set else None)
     if data.subzone_id is not None:
         _ensure_subzone_visible(db, principal, data.subzone_id, Perm.CONTACTS_MANAGE)
         contact.subzone_id = data.subzone_id
@@ -150,29 +218,27 @@ def count_all_active(db: Session, principal: Principal) -> int:
 
 def active_contacts_in_subzones(db: Session, subzone_ids: set[int]) -> list[ContactRef]:
     """Active contacts in the given subzones, for the team's reports. Inactive areas are not counted."""
+    rows = repository.active_in_subzones(db, subzone_ids & territories_service.active_subzone_ids(db))
+    return _refs(db, rows)
+
+
+def contact_summaries(db: Session, contact_ids: set[int]) -> dict[int, ContactRef]:
+    return {ref.id: ref for ref in _refs(db, repository.contacts_with_category(db, contact_ids))}
+
+
+def _refs(db: Session, rows: list[tuple[Contact, str]]) -> list[ContactRef]:
+    types = repository.type_names(db, {contact.type_id for contact, _ in rows if contact.type_id is not None})
     return [
         ContactRef(
             id=contact.id,
             name=contact.name,
             category_name=category_name,
+            type_name=types.get(contact.type_id) if contact.type_id is not None else None,
             subzone_id=contact.subzone_id,
             is_active=contact.is_active,
         )
-        for contact, category_name in repository.active_in_subzones(db, subzone_ids & territories_service.active_subzone_ids(db))
+        for contact, category_name in rows
     ]
-
-
-def contact_summaries(db: Session, contact_ids: set[int]) -> dict[int, ContactRef]:
-    return {
-        contact.id: ContactRef(
-            id=contact.id,
-            name=contact.name,
-            category_name=category_name,
-            subzone_id=contact.subzone_id,
-            is_active=contact.is_active,
-        )
-        for contact, category_name in repository.contacts_with_category(db, contact_ids)
-    }
 
 
 def _manageable_contact(db: Session, principal: Principal, contact_id: int) -> Contact:
@@ -189,6 +255,27 @@ def _ensure_category_active(db: Session, category_id: int) -> None:
         raise BadRequest(CATEGORY_NOT_FOUND)
     if not category.is_active:
         raise BadRequest(CATEGORY_INACTIVE)
+
+
+def _ensure_category_exists(db: Session, category_id: int) -> None:
+    if repository.get_category(db, category_id) is None:
+        raise BadRequest(CATEGORY_NOT_FOUND)
+
+
+def _set_type(db: Session, contact: Contact, type_id: int | None) -> None:
+    if type_id is not None:
+        _ensure_type_fits(db, type_id, contact.category_id)
+    contact.type_id = type_id
+
+
+def _ensure_type_fits(db: Session, type_id: int, category_id: int) -> None:
+    contact_type = repository.get_type(db, type_id)
+    if contact_type is None:
+        raise BadRequest(TYPE_NOT_FOUND)
+    if contact_type.category_id != category_id:
+        raise BadRequest(TYPE_OTHER_CATEGORY)
+    if not contact_type.is_active:
+        raise BadRequest(TYPE_INACTIVE)
 
 
 def _ensure_subzone_visible(db: Session, principal: Principal, subzone_id: int, code: Perm) -> None:
@@ -218,12 +305,15 @@ def _category_name(db: Session, category_id: int) -> str:
 
 def _to_reads(db: Session, rows: list[tuple[Contact, str]]) -> list[ContactRead]:
     locations = territories_service.subzone_locations(db, {contact.subzone_id for contact, _ in rows})
+    types = repository.type_names(db, {contact.type_id for contact, _ in rows if contact.type_id is not None})
     return [
         ContactRead(
             id=contact.id,
             name=contact.name,
             category_id=contact.category_id,
             category_name=category_name,
+            type_id=contact.type_id,
+            type_name=types.get(contact.type_id) if contact.type_id is not None else None,
             subzone_id=contact.subzone_id,
             subzone_name=locations[contact.subzone_id].name,
             zone_id=locations[contact.subzone_id].zone_id,

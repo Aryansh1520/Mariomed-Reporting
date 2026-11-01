@@ -13,6 +13,7 @@ import '../../core/utils/business_time.dart';
 import '../../core/widgets/app_dialogs.dart';
 import '../../core/widgets/month_calendar.dart';
 import '../../models/visit.dart';
+import '../../models/contact.dart';
 
 /// The top half is a calendar of the days still open for reporting. The bottom half is the selected day.
 class CompleteDayView extends GetView<CompleteDayController> {
@@ -392,7 +393,7 @@ class _VisitRow extends StatelessWidget {
                   style: text.titleSmall?.copyWith(fontWeight: FontWeight.w700),
                 ),
                 Text(
-                  visit.categoryName,
+                  contactKind(visit.categoryName, visit.typeName),
                   style: text.bodySmall?.copyWith(
                     color: p.primary,
                     fontWeight: FontWeight.w600,

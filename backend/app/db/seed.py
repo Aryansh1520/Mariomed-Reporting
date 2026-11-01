@@ -11,6 +11,7 @@ from sqlalchemy import func, select
 
 from app.core.config import settings
 from app.db.session import SessionLocal
+from app.modules.contacts import service as contacts_service
 from app.modules.rbac import repository as rbac_repository
 from app.modules.rbac import service as rbac_service
 from app.modules.rbac.catalog import Perm, PermissionScope
@@ -24,6 +25,8 @@ SALES_REP_ROLE_CODE = "sales_representative"
 
 TEAM_ADMIN_ROLE_NAME = "Team administrator"
 TEAM_ADMIN_ROLE_CODE = "team_administrator"
+
+CONTACT_CATEGORY_NAMES = ("Doctor", "Chemist")
 
 # Example grants for someone who runs the team without reporting calls: people, roles, zones, contacts,
 # products and the setup. They read every visit to see coverage, but they cannot record one.
@@ -49,7 +52,6 @@ DEMO_SALES_REP_GRANTS: dict[str, PermissionScope | None] = {
     Perm.TERRITORIES_READ.value: PermissionScope.ASSIGNED,
     Perm.PRODUCTS_READ.value: None,
     Perm.CONTACTS_READ.value: PermissionScope.ASSIGNED,
-    Perm.CONTACTS_MANAGE.value: PermissionScope.ASSIGNED,
     Perm.PLANS_READ.value: PermissionScope.SELF,
     Perm.PLANS_MANAGE.value: PermissionScope.SELF,
     Perm.VISITS_READ.value: PermissionScope.SELF,
@@ -72,6 +74,8 @@ def run_seed() -> None:
         _ensure_user(db, sales_rep_role.id, _sales_rep_user())
         _ensure_user(db, team_admin_role.id, _team_admin_user())
         _ensure_map_regions(db)
+        for name in CONTACT_CATEGORY_NAMES:
+            contacts_service.ensure_category(db, name)
         db.commit()
 
 

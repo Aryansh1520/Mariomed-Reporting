@@ -13,6 +13,7 @@ class TerritoryContactsController extends GetxController {
   final Territory territory;
   final _contacts = <Contact>[].obs;
   final _categories = <ContactCategory>[].obs;
+  final _types = <ContactType>[].obs;
   final _isLoading = true.obs;
   final _errorMessage = RxnString();
 
@@ -20,6 +21,12 @@ class TerritoryContactsController extends GetxController {
 
   /// The categories a contact can be given. Switched-off categories are left out.
   List<ContactCategory> get categories => _categories;
+
+  /// The switched-on types under [categoryId]. Empty when the category has none, and the form then skips the type step.
+  List<ContactType> typesFor(int categoryId) => [
+    for (final type in _types)
+      if (type.categoryId == categoryId && type.isActive) type,
+  ];
 
   bool get isLoading => _isLoading.value;
 
@@ -39,8 +46,10 @@ class TerritoryContactsController extends GetxController {
     try {
       final all = await _service.listCategories();
       _categories.assignAll(all.where((category) => category.isActive));
+      _types.assignAll(await _service.listTypes());
     } on AppException {
       _categories.clear();
+      _types.clear();
     }
   }
 
@@ -49,6 +58,8 @@ class TerritoryContactsController extends GetxController {
     Contact? contact,
     required String name,
     int? categoryId,
+    int? typeId,
+    bool changeType = false,
   }) async {
     try {
       if (contact == null) {
@@ -57,12 +68,15 @@ class TerritoryContactsController extends GetxController {
           name: name,
           categoryId: categoryId,
           subzoneId: territory.id,
+          typeId: typeId,
         );
       } else {
         await _service.updateContact(
           contact.id,
           name: name,
           categoryId: categoryId,
+          typeId: typeId,
+          changeType: changeType,
         );
       }
       await load();

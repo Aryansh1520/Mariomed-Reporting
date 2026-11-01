@@ -94,7 +94,9 @@ class _Brand extends StatelessWidget {
     return MeshHero(
       child: SafeArea(
         bottom: false,
-        child: Center(
+        child: Align(
+          // Above the centre, so the logo clears the top edge of the sign-in card.
+          alignment: const Alignment(0, -0.3),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(
               AppSpace.l,

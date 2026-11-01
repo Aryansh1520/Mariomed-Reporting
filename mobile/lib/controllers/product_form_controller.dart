@@ -47,7 +47,7 @@ class ProductFormController extends GetxController {
     errorMessage.value = null;
     try {
       await _write(nameText, codeText);
-      Get.back<bool>(result: true);
+      Get.back(result: true);
     } on AppException catch (e) {
       errorMessage.value = e.message;
     } finally {

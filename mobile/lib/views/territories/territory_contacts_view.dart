@@ -82,12 +82,36 @@ class TerritoryContactsView extends GetView<TerritoryContactsController> {
       ],
     );
     if (categoryId == null && contact == null) return;
+    final typeChoice = await _chooseType(categoryId ?? contact?.categoryId);
     final problem = await controller.saveContact(
       contact: contact,
       name: name.trim(),
       categoryId: categoryId,
+      typeId: typeChoice?.typeId,
+      changeType: typeChoice != null,
     );
     if (problem != null) await AppDialogs.error('Could not save', problem);
+  }
+
+  /// Asks for the optional type under [categoryId]. Null when the category has no types or the sheet is dismissed.
+  Future<_TypeChoice?> _chooseType(int? categoryId) async {
+    if (categoryId == null) return null;
+    final types = controller.typesFor(categoryId);
+    if (types.isEmpty) return null;
+    final picked = await AppDialogs.choose<int>(
+      title: 'Type',
+      choices: [
+        const AppChoice<int>(
+          value: _noType,
+          label: 'No type',
+          icon: Iconsax.close_circle,
+        ),
+        for (final type in types)
+          AppChoice<int>(value: type.id, label: type.name, icon: Iconsax.category),
+      ],
+    );
+    if (picked == null) return null;
+    return _TypeChoice(picked == _noType ? null : picked);
   }
 
   Widget _body(BuildContext context, double gutter) {
@@ -199,8 +223,8 @@ class _ContactRow extends StatelessWidget {
                   const SizedBox(height: AppSpace.xs),
                   Text(
                     contact.isActive
-                        ? contact.categoryName
-                        : '${contact.categoryName} · Switched off',
+                        ? contactKind(contact.categoryName, contact.typeName)
+                        : '${contactKind(contact.categoryName, contact.typeName)}  ·  Switched off',
                     style: text.bodySmall?.copyWith(
                       color: p.primary,
                       fontWeight: FontWeight.w600,
@@ -233,4 +257,14 @@ class _ContactRow extends StatelessWidget {
       arguments: VisitRecordArgs(contact: contact),
     );
   }
+}
+
+/// Ids start at 1, so 0 stands for "No type" in the type sheet.
+const _noType = 0;
+
+/// The type picked in the form. [typeId] is null for "No type".
+class _TypeChoice {
+  const _TypeChoice(this.typeId);
+
+  final int? typeId;
 }

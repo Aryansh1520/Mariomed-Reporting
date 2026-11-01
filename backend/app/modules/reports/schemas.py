@@ -32,6 +32,7 @@ class CallLine(BaseModel):
     visit_time: time
     contact_name: str
     category_name: str
+    type_name: str | None
     products: list[str]
     remarks: str
     status: str
@@ -109,6 +110,7 @@ class TeamCallLine(BaseModel):
     rep_name: str
     contact_name: str
     category_name: str
+    type_name: str | None
     zone_name: str
     products: list[str]
     status: str
@@ -117,6 +119,7 @@ class TeamCallLine(BaseModel):
 class MissedContactLine(BaseModel):
     contact_name: str
     category_name: str
+    type_name: str | None
     zone_name: str
 
 

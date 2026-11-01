@@ -49,23 +49,74 @@ class ContactService {
         ];
       });
 
+  /// A type is optional. Null [typeId] means no type.
   Future<void> createContact({
     required String name,
     required int categoryId,
     required int subzoneId,
+    int? typeId,
   }) => _api.postData<void>(
     '/contacts',
     (_) {},
-    body: {'name': name, 'category_id': categoryId, 'subzone_id': subzoneId},
+    body: {
+      'name': name,
+      'category_id': categoryId,
+      'type_id': typeId,
+      'subzone_id': subzoneId,
+    },
   );
 
-  /// Only the fields given are changed.
-  Future<void> updateContact(int contactId, {String? name, int? categoryId}) =>
-      _api.patchData<void>(
-        '/contacts/$contactId',
-        (_) {},
-        body: {'name': ?name, 'category_id': ?categoryId},
-      );
+  /// Only the fields given are changed. The type changes only when [changeType] is set, so null can clear it.
+  Future<void> updateContact(
+    int contactId, {
+    String? name,
+    int? categoryId,
+    int? typeId,
+    bool changeType = false,
+  }) => _api.patchData<void>(
+    '/contacts/$contactId',
+    (_) {},
+    body: {
+      'name': ?name,
+      'category_id': ?categoryId,
+      if (changeType) 'type_id': typeId,
+    },
+  );
+
+  /// The types of every category, or of one category when [categoryId] is given. Read in one page of up to 100.
+  Future<List<ContactType>> listTypes({int? categoryId}) {
+    final category = categoryId == null ? '' : '&category_id=$categoryId';
+    return _api.getData<List<ContactType>>(
+      '/contacts/types?page_size=100$category',
+      (data) {
+        final items = ApiService.asJsonMap(data)['items'] as List<Object?>;
+        return [
+          for (final item in items)
+            ContactType.fromJson(ApiService.asJsonMap(item)),
+        ];
+      },
+    );
+  }
+
+  Future<ContactType> createType({
+    required int categoryId,
+    required String name,
+  }) => _api.postData<ContactType>(
+    '/contacts/types',
+    (data) => ContactType.fromJson(ApiService.asJsonMap(data)),
+    body: {'category_id': categoryId, 'name': name},
+  );
+
+  /// Renames a type or switches it on or off. Only the fields given are changed.
+  Future<ContactType> updateType(
+    int typeId, {
+    String? name,
+    bool? isActive,
+  }) => _api.patchData<ContactType>(
+    '/contacts/types/$typeId',
+    (data) => ContactType.fromJson(ApiService.asJsonMap(data)),
+    body: {'name': ?name, 'is_active': ?isActive},
+  );
 
   Future<ContactCategory> createCategory(String name) =>
       _api.postData<ContactCategory>(

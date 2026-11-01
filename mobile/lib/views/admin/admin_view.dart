@@ -14,6 +14,7 @@ import '../../core/widgets/pill_tabs.dart';
 import '../../models/team_user.dart';
 import '../../services/auth_service.dart';
 import 'performance_view.dart';
+import 'user_territories_sheet.dart';
 
 enum _AdminSection { team, roles, performance }
 
@@ -138,6 +139,7 @@ class _TeamList extends GetView<AdminController> {
                     itemBuilder: (context, index) => _UserRow(
                       user: users[index],
                       canManage: canManage && users[index].id != me,
+                      canAssign: auth.can('territories.manage'),
                       p: p,
                       text: text,
                     ),
@@ -168,14 +170,34 @@ class _UserRow extends StatelessWidget {
   const _UserRow({
     required this.user,
     required this.canManage,
+    required this.canAssign,
     required this.p,
     required this.text,
   });
 
   final TeamUser user;
   final bool canManage;
+  final bool canAssign;
   final AppPalette p;
   final TextTheme text;
+
+  Future<void> _openTerritories(BuildContext context) async {
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => UserTerritoriesSheet(
+        controller: Get.find<AdminController>(),
+        user: user,
+      ),
+    );
+    if (saved == true && context.mounted) {
+      await AppDialogs.success(
+        'Zones saved',
+        '${user.fullName} is now assigned to the chosen zones and subzones.',
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -215,6 +237,12 @@ class _UserRow extends StatelessWidget {
                 ],
               ),
             ),
+            if (canAssign)
+              IconButton(
+                tooltip: 'Zones and subzones',
+                icon: const Icon(Iconsax.location, size: 20),
+                onPressed: () => _openTerritories(context),
+              ),
             if (canManage)
               Obx(
                 () => Switch(

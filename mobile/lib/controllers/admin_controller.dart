@@ -2,6 +2,7 @@ import 'package:get/get.dart';
 
 import '../models/role.dart';
 import '../models/team_user.dart';
+import '../models/territory.dart';
 import '../services/admin_service.dart';
 import '../services/auth_service.dart';
 import '../services/app_exception.dart';
@@ -49,6 +50,18 @@ class AdminController extends GetxController {
         await _service.setActive(user.id, isActive: isActive);
         users.assignAll(await _service.listUsers());
       });
+
+  /// The zones and subzones on offer, and the ones this user already holds. Throws when the server refuses either.
+  Future<({List<Territory> options, List<int> assigned})> loadAssignment(
+    int userId,
+  ) async {
+    final options = await _service.listTerritories();
+    final assigned = await _service.listUserTerritoryIds(userId);
+    return (options: options, assigned: assigned);
+  }
+
+  Future<String?> saveAssignment(TeamUser user, List<int> territoryIds) =>
+      _run(() => _service.setUserTerritoryIds(user.id, territoryIds));
 
   Future<String?> createUser({
     required String fullName,

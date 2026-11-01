@@ -57,6 +57,7 @@ class VisitRead(BaseModel):
     contact_id: int
     contact_name: str
     category_name: str
+    type_name: str | None
     zone_id: int
     zone_name: str
     subzone_id: int
@@ -89,6 +90,7 @@ class JointRequestRead(BaseModel):
     visit_time: time
     contact_name: str
     category_name: str
+    type_name: str | None
     zone_name: str
     subzone_name: str
     remarks: str

@@ -13,6 +13,7 @@ class PlanItemRead(BaseModel):
     contact_id: int
     contact_name: str
     category_name: str
+    type_name: str | None
     zone_name: str
     subzone_name: str
     status: str
