@@ -71,6 +71,7 @@ class CallLine {
     required this.visitTime,
     required this.contactName,
     required this.categoryName,
+    this.typeName,
     required this.products,
     required this.remarks,
     required this.status,
@@ -82,6 +83,7 @@ class CallLine {
     visitTime: json['visit_time'] as String,
     contactName: json['contact_name'] as String,
     categoryName: json['category_name'] as String,
+    typeName: json['type_name'] as String?,
     products: [
       for (final product in json['products'] as List<Object?>)
         product as String,
@@ -95,6 +97,7 @@ class CallLine {
   final String visitTime;
   final String contactName;
   final String categoryName;
+  final String? typeName;
   final List<String> products;
   final String remarks;
   final String status;

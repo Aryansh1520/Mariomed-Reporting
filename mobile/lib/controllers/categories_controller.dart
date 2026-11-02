@@ -15,6 +15,7 @@ class CategoriesController extends GetxController {
   final ContactService _service;
   final TeamDashboardService _dashboard;
   final categories = <ContactCategory>[].obs;
+  final types = <ContactType>[].obs;
   final isLoading = true.obs;
   final errorMessage = RxnString();
 
@@ -35,6 +36,7 @@ class CategoriesController extends GetxController {
     errorMessage.value = null;
     try {
       categories.assignAll(await _service.listCategories());
+      types.assignAll(await _service.listTypes());
     } on AppException catch (e) {
       errorMessage.value = e.message;
     } finally {
@@ -68,6 +70,42 @@ class CategoriesController extends GetxController {
       } else {
         await _service.updateCategory(category.id, name: name);
       }
+      await load();
+      return null;
+    } on AppException catch (e) {
+      return e.message;
+    }
+  }
+
+  /// The types under one category, switched-off ones included.
+  List<ContactType> typesOf(int categoryId) =>
+      types.where((type) => type.categoryId == categoryId).toList();
+
+  /// Adds a type under [categoryId], or renames [contactType] when it is given. Returns the problem to show, or null when saved.
+  Future<String?> saveType(
+    int categoryId,
+    String name, {
+    ContactType? contactType,
+  }) async {
+    try {
+      if (contactType == null) {
+        await _service.createType(categoryId: categoryId, name: name);
+      } else {
+        await _service.updateType(contactType.id, name: name);
+      }
+      await load();
+      return null;
+    } on AppException catch (e) {
+      return e.message;
+    }
+  }
+
+  Future<String?> setTypeActive(
+    ContactType contactType, {
+    required bool isActive,
+  }) async {
+    try {
+      await _service.updateType(contactType.id, isActive: isActive);
       await load();
       return null;
     } on AppException catch (e) {

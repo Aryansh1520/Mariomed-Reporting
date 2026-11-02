@@ -10,7 +10,7 @@ class CategoriesBinding extends Bindings {
   void dependencies() {
     Get.lazyPut<CategoriesController>(
       () => CategoriesController(
-        Get.find<ContactService>(),
+        ContactService(Get.find<ApiService>()),
         TeamDashboardService(Get.find<ApiService>()),
       ),
     );

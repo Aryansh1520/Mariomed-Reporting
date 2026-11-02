@@ -14,6 +14,7 @@ import '../../models/team_dashboard.dart';
 import '../../services/api_service.dart';
 import '../../services/app_exception.dart';
 import '../../services/team_dashboard_service.dart';
+import '../../models/contact.dart';
 
 /// Everything the team did on one day, with previous and next day arrows. Never goes past today.
 class TeamDayView extends StatefulWidget {
@@ -464,7 +465,7 @@ class _MissedRow extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpace.xs),
                 Text(
-                  '${contact.categoryName}  ·  ${contact.zoneName}',
+                  '${contactKind(contact.categoryName, contact.typeName)}  ·  ${contact.zoneName}',
                   style: text.bodySmall?.copyWith(color: p.inkMuted),
                 ),
               ],
@@ -581,7 +582,7 @@ class _DayCallRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${call.contactName}  ·  ${call.categoryName}',
+                  '${call.contactName}  ·  ${contactKind(call.categoryName, call.typeName)}',
                   style: text.titleSmall?.copyWith(
                     fontWeight: FontWeight.w800,
                     color: p.ink,

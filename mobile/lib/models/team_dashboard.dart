@@ -220,6 +220,7 @@ class TeamCallLine {
     required this.repName,
     required this.contactName,
     required this.categoryName,
+    this.typeName,
     required this.zoneName,
     required this.products,
     required this.status,
@@ -231,6 +232,7 @@ class TeamCallLine {
     repName: json['rep_name'] as String,
     contactName: json['contact_name'] as String,
     categoryName: json['category_name'] as String,
+    typeName: json['type_name'] as String?,
     zoneName: json['zone_name'] as String,
     products: [
       for (final name in json['products'] as List<Object?>) name as String,
@@ -243,6 +245,7 @@ class TeamCallLine {
   final String repName;
   final String contactName;
   final String categoryName;
+  final String? typeName;
   final String zoneName;
   final List<String> products;
   final String status;
@@ -253,16 +256,19 @@ class MissedContact {
   const MissedContact({
     required this.contactName,
     required this.categoryName,
+    this.typeName,
     required this.zoneName,
   });
 
   factory MissedContact.fromJson(Map<String, Object?> json) => MissedContact(
     contactName: json['contact_name'] as String,
     categoryName: json['category_name'] as String,
+    typeName: json['type_name'] as String?,
     zoneName: json['zone_name'] as String,
   );
 
   final String contactName;
   final String categoryName;
+  final String? typeName;
   final String zoneName;
 }

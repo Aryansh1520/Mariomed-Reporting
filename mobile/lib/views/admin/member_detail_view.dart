@@ -17,6 +17,7 @@ import '../../services/app_exception.dart';
 import '../../services/auth_service.dart';
 import '../../services/member_report_service.dart';
 import '../../services/visit_service.dart';
+import '../../models/contact.dart';
 
 /// What the member detail page opens on: the person and the period.
 class MemberDetailArgs {
@@ -1090,7 +1091,7 @@ class _CallRow extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '${call.contactName}  ·  ${call.categoryName}',
+                    '${call.contactName}  ·  ${contactKind(call.categoryName, call.typeName)}',
                     style: text.titleSmall?.copyWith(
                       fontWeight: FontWeight.w800,
                       color: p.ink,
@@ -1226,7 +1227,7 @@ class _CallDetailSheet extends StatelessWidget {
               ),
               const SizedBox(height: AppSpace.xs),
               Text(
-                call.categoryName,
+                contactKind(call.categoryName, call.typeName),
                 style: text.bodyMedium?.copyWith(color: p.inkMuted),
               ),
               const SizedBox(height: AppSpace.l),

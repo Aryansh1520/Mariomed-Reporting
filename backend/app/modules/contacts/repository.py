@@ -1,8 +1,8 @@
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.modules.contacts.models import Contact, ContactCategory
-from app.modules.contacts.schemas import ContactListQuery
+from app.modules.contacts.models import Contact, ContactCategory, ContactType
+from app.modules.contacts.schemas import ContactListQuery, TypeListQuery
 
 
 def list_categories(db: Session) -> list[ContactCategory]:
@@ -15,6 +15,30 @@ def get_category(db: Session, category_id: int) -> ContactCategory | None:
 
 def get_category_by_name(db: Session, name: str) -> ContactCategory | None:
     return db.scalar(select(ContactCategory).where(ContactCategory.name == name))
+
+
+def get_type(db: Session, type_id: int) -> ContactType | None:
+    return db.get(ContactType, type_id)
+
+
+def get_type_by_name(db: Session, category_id: int, name: str) -> ContactType | None:
+    return db.scalar(select(ContactType).where(ContactType.category_id == category_id, ContactType.name == name))
+
+
+def list_types_page(db: Session, query: TypeListQuery) -> tuple[list[ContactType], int]:
+    filtered = select(ContactType)
+    if query.category_id is not None:
+        filtered = filtered.where(ContactType.category_id == query.category_id)
+    total = db.scalar(select(func.count()).select_from(filtered.subquery())) or 0
+    page = filtered.order_by(ContactType.name, ContactType.id).offset(query.offset).limit(query.page_size)
+    return list(db.scalars(page)), total
+
+
+def type_names(db: Session, type_ids: set[int]) -> dict[int, str]:
+    if not type_ids:
+        return {}
+    rows = db.execute(select(ContactType.id, ContactType.name).where(ContactType.id.in_(type_ids)))
+    return {type_id: name for type_id, name in rows}
 
 
 def get_contact(db: Session, contact_id: int) -> Contact | None:

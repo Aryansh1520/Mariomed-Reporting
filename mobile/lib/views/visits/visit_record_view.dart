@@ -14,6 +14,7 @@ import '../../core/utils/business_time.dart';
 import '../../core/widgets/app_dialogs.dart';
 import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/loading_list.dart';
+import '../../models/contact.dart';
 
 /// Stored as the choice for "no joint partner". Real user ids are always positive.
 const _noPartner = 0;
@@ -98,7 +99,7 @@ class _ContactHeader extends StatelessWidget {
         ),
         const SizedBox(height: AppSpace.xs),
         Text(
-          contact.categoryName,
+          contactKind(contact.categoryName, contact.typeName),
           style: text.bodyMedium?.copyWith(
             color: p.primary,
             fontWeight: FontWeight.w600,

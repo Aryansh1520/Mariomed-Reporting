@@ -35,18 +35,20 @@ class StatusPill extends StatelessWidget {
   }
 }
 
-/// Edit, and Delete (or Restore for an inactive item), at the bottom of a managed row.
+/// Edit, and Delete (or Restore for an inactive item), at the bottom of a managed row. [onTypes] adds a Types action.
 class ManageActions extends StatelessWidget {
   const ManageActions({
     super.key,
     required this.active,
     required this.onEdit,
     required this.onToggle,
+    this.onTypes,
   });
 
   final bool active;
   final VoidCallback onEdit;
   final VoidCallback onToggle;
+  final VoidCallback? onTypes;
 
   @override
   Widget build(BuildContext context) {
@@ -54,6 +56,12 @@ class ManageActions extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
+        if (onTypes != null)
+          TextButton.icon(
+            onPressed: onTypes,
+            icon: const Icon(Iconsax.category, size: 16),
+            label: const Text('Types'),
+          ),
         TextButton.icon(
           onPressed: onEdit,
           icon: const Icon(Iconsax.edit_2, size: 16),

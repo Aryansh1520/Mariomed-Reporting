@@ -13,6 +13,10 @@ from app.modules.contacts.schemas import (
     ContactListQuery,
     ContactRead,
     ContactUpdate,
+    TypeCreate,
+    TypeListQuery,
+    TypeRead,
+    TypeUpdate,
 )
 from app.modules.rbac.principal import Principal
 
@@ -44,6 +48,37 @@ def update_category(
     db: Session = Depends(get_db),
 ) -> CategoryRead:
     return service.update_category(db, principal, category_id, body)
+
+
+@router.get("/types", response_model=Page[TypeRead])
+def list_types(
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=100, ge=1, le=100),
+    category_id: int | None = None,
+    principal: Principal = Depends(get_principal),
+    db: Session = Depends(get_db),
+) -> Page[TypeRead]:
+    query = TypeListQuery(page=page, page_size=page_size, category_id=category_id)
+    return service.list_types(db, principal, query)
+
+
+@router.post("/types", response_model=TypeRead)
+def create_type(
+    body: TypeCreate,
+    principal: Principal = Depends(get_principal),
+    db: Session = Depends(get_db),
+) -> TypeRead:
+    return service.create_type(db, principal, body)
+
+
+@router.patch("/types/{type_id}", response_model=TypeRead)
+def update_type(
+    type_id: int,
+    body: TypeUpdate,
+    principal: Principal = Depends(get_principal),
+    db: Session = Depends(get_db),
+) -> TypeRead:
+    return service.update_type(db, principal, type_id, body)
 
 
 @router.get("", response_model=Page[ContactRead])

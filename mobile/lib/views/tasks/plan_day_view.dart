@@ -309,7 +309,7 @@ class _PlanRow extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpace.xs),
                 Text(
-                  '${item.categoryName}  ·  ${item.zoneName}  ›  ${item.subzoneName}',
+                  '${contactKind(item.categoryName, item.typeName)}  ·  ${item.zoneName}  ›  ${item.subzoneName}',
                   style: text.bodySmall?.copyWith(color: p.inkMuted),
                 ),
                 const SizedBox(height: AppSpace.xs),
@@ -378,7 +378,7 @@ class _ContactPickerState extends State<_ContactPicker> {
     if (needle.isEmpty) return true;
     return [
       contact.name,
-      contact.categoryName,
+      contactKind(contact.categoryName, contact.typeName),
       contact.zoneName,
       contact.subzoneName,
     ].any((field) => field.toLowerCase().contains(needle));
@@ -497,7 +497,7 @@ class _ContactPickerState extends State<_ContactPicker> {
         style: text.titleSmall?.copyWith(fontWeight: FontWeight.w700),
       ),
       subtitle: Text(
-        '${contact.categoryName}  ·  ${contact.zoneName}  ›  ${contact.subzoneName}',
+        '${contactKind(contact.categoryName, contact.typeName)}  ·  ${contact.zoneName}  ›  ${contact.subzoneName}',
         style: text.bodySmall?.copyWith(color: p.inkMuted),
       ),
       onChanged: (value) => setState(() {

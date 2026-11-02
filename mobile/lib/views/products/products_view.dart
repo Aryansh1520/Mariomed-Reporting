@@ -122,8 +122,8 @@ class ProductsView extends GetView<ProductsController> {
   /// Opens the form, then reloads the list when something was saved.
   Future<void> _openForm([Product? product]) async {
     final saved = product == null
-        ? await Get.toNamed<bool>(AppRoutes.productNew)
-        : await Get.toNamed<bool>(AppRoutes.productEdit, arguments: product);
+        ? await Get.toNamed(AppRoutes.productNew)
+        : await Get.toNamed(AppRoutes.productEdit, arguments: product);
     if (saved == true) await controller.loadProducts();
   }
 }

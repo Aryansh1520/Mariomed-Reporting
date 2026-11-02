@@ -6,6 +6,7 @@ class PlanItem {
     required this.contactId,
     required this.contactName,
     required this.categoryName,
+    this.typeName,
     required this.zoneName,
     required this.subzoneName,
     required this.status,
@@ -17,6 +18,7 @@ class PlanItem {
     contactId: json['contact_id'] as int,
     contactName: json['contact_name'] as String,
     categoryName: json['category_name'] as String,
+    typeName: json['type_name'] as String?,
     zoneName: json['zone_name'] as String,
     subzoneName: json['subzone_name'] as String,
     status: json['status'] as String,
@@ -27,6 +29,7 @@ class PlanItem {
   final int contactId;
   final String contactName;
   final String categoryName;
+  final String? typeName;
   final String zoneName;
   final String subzoneName;
 
