@@ -31,7 +31,7 @@ class LoginView extends GetView<LoginController> {
 
   /// The hero sits at the top and the card is centred on the whole screen, so the card's centre is the screen's centre.
   Widget _stackedLayout(BuildContext context, ScreenSize size) {
-    final gutter = AppLayout.gutter(size);
+    final gutter = AppLayout.gutterOf(context);
     // Home's hero is about half the screen and fades into the page at its bottom edge; the login hero matches that.
     final heroHeight = MediaQuery.sizeOf(context).height * 0.5;
     return Stack(
@@ -88,9 +88,6 @@ class _Brand extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final p = context.palette;
-    final text = Theme.of(context).textTheme;
-
     return MeshHero(
       child: SafeArea(
         bottom: false,
@@ -111,15 +108,6 @@ class _Brand extends StatelessWidget {
                   'assets/images/mariomed-logo.png',
                   height: 96,
                   semanticLabel: AppConstants.appName,
-                ),
-                const SizedBox(height: AppSpace.m),
-                Text(
-                  'Visits, plans and targets for the field team.',
-                  textAlign: TextAlign.center,
-                  style: text.bodyLarge?.copyWith(
-                    color: p.onHero,
-                    fontWeight: FontWeight.w500,
-                  ),
                 ),
               ],
             ),
@@ -206,6 +194,19 @@ class _SignInCard extends StatelessWidget {
               ),
             );
           }),
+          const SizedBox(height: AppSpace.s),
+          Obx(
+            () => CheckboxListTile(
+              value: controller.rememberMe.value,
+              onChanged: controller.isLoading.value
+                  ? null
+                  : (value) => controller.rememberMe.value = value ?? false,
+              title: const Text('Remember me'),
+              controlAffinity: ListTileControlAffinity.leading,
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+            ),
+          ),
           const SizedBox(height: AppSpace.xl),
           Obx(
             () => FilledButton(
@@ -219,6 +220,27 @@ class _SignInCard extends StatelessWidget {
                   : const Text('Sign in'),
             ),
           ),
+          Obx(() {
+            if (!controller.biometricReady.value) {
+              return const SizedBox.shrink();
+            }
+            return Column(
+              children: [
+                const SizedBox(height: AppSpace.s),
+                OutlinedButton.icon(
+                  onPressed: controller.isLoading.value
+                      ? null
+                      : controller.signInWithBiometrics,
+                  icon: const Icon(Iconsax.finger_scan),
+                  label: const Text('Use fingerprint or face'),
+                ),
+                TextButton(
+                  onPressed: controller.turnOffBiometricSignIn,
+                  child: const Text('Turn off fingerprint or face sign-in'),
+                ),
+              ],
+            );
+          }),
           const SizedBox(height: AppSpace.s),
           TextButton(
             onPressed: controller.forgotPassword,

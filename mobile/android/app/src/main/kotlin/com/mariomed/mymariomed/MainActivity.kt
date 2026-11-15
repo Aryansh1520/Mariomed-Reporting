@@ -1,5 +1,6 @@
 package com.mariomed.mymariomed
 
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 
-class MainActivity : FlutterActivity()
+// Biometric prompts need a FragmentActivity, which FlutterActivity is not.
+class MainActivity : FlutterFragmentActivity()

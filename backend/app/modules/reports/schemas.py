@@ -66,9 +66,9 @@ class EmployeeLine(BaseModel):
     calls: int
     contacts_visited: int
     days_reported: int
+    days_leave: int
     working_days: int
     avg_calls_per_day: float
-    planned_due: int
     missed_calls: int
 
 

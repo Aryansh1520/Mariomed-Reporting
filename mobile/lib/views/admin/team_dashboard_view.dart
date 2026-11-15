@@ -54,9 +54,9 @@ class TeamDashboardSections extends StatelessWidget {
         _SectionCard(
           icon: Iconsax.location,
           tone: _Tone.green,
-          title: 'Zones',
-          trailing: '${data.zones.length} zones',
-          empty: 'No zones yet.',
+          title: 'Headquarters',
+          trailing: '${data.zones.length} headquarters',
+          empty: 'No headquarters yet.',
           children: [
             for (final line in data.zones)
               _ZoneRow(line: line, onTap: () => _openZone(line)),
@@ -731,7 +731,7 @@ class TeamSectionPage extends StatelessWidget {
             maxWidth: AppLayout.contentMaxWidth(size),
           ),
           child: ListView(
-            padding: EdgeInsets.all(AppLayout.gutter(size)),
+            padding: EdgeInsets.all(AppLayout.gutterOf(context)),
             children: [
               for (var i = 0; i < rows.length; i++) ...[
                 if (i > 0) const SizedBox(height: AppSpace.m),
@@ -896,7 +896,9 @@ class _PersonRow extends StatelessWidget {
                       style: text.bodySmall?.copyWith(color: p.inkMuted),
                     ),
                     const SizedBox(height: AppSpace.m),
-                    Row(
+                    Wrap(
+                      spacing: AppSpace.l,
+                      runSpacing: AppSpace.s,
                       children: [
                         _Metric(
                           icon: Iconsax.call,
@@ -904,13 +906,18 @@ class _PersonRow extends StatelessWidget {
                           label: 'Calls',
                           tone: _Tone.blue,
                         ),
-                        const _RuleDivider(),
                         _Metric(
                           icon: Iconsax.call_remove,
                           value: '${line.missedCalls}',
                           label: 'Missed',
                           tone: _Tone.red,
                           valueColor: _Tone.red.color,
+                        ),
+                        _Metric(
+                          icon: Iconsax.calendar_remove,
+                          value: '${line.daysLeave}',
+                          label: 'Leave',
+                          tone: _Tone.orange,
                         ),
                       ],
                     ),

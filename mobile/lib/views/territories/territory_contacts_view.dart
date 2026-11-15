@@ -49,7 +49,7 @@ class TerritoryContactsView extends GetView<TerritoryContactsController> {
           constraints: BoxConstraints(
             maxWidth: AppLayout.contentMaxWidth(size),
           ),
-          child: Obx(() => _body(context, AppLayout.gutter(size))),
+          child: Obx(() => _body(context, AppLayout.gutterOf(context))),
         ),
       ),
     );
@@ -107,7 +107,11 @@ class TerritoryContactsView extends GetView<TerritoryContactsController> {
           icon: Iconsax.close_circle,
         ),
         for (final type in types)
-          AppChoice<int>(value: type.id, label: type.name, icon: Iconsax.category),
+          AppChoice<int>(
+            value: type.id,
+            label: type.name,
+            icon: Iconsax.category,
+          ),
       ],
     );
     if (picked == null) return null;
@@ -129,8 +133,8 @@ class TerritoryContactsView extends GetView<TerritoryContactsController> {
         icon: Iconsax.user,
         title: 'No contacts here yet',
         message: controller.isZone
-            ? 'Nobody is recorded in this zone yet.'
-            : 'Nobody is recorded in this subzone yet.',
+            ? 'Nobody is recorded in this headquarter yet.'
+            : 'Nobody is recorded in this patch yet.',
       );
     }
     return RefreshIndicator(

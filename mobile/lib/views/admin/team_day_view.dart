@@ -95,7 +95,7 @@ class _TeamDayViewState extends State<TeamDayView> {
             children: [
               Padding(
                 padding: EdgeInsets.symmetric(
-                  horizontal: AppLayout.gutter(size),
+                  horizontal: AppLayout.gutterOf(context),
                 ),
                 child: Row(
                   children: [
@@ -160,7 +160,7 @@ class _TeamDayViewState extends State<TeamDayView> {
                     }
                     return _DayBody(
                       figures: snapshot.data!,
-                      gutter: AppLayout.gutter(size),
+                      gutter: AppLayout.gutterOf(context),
                     );
                   },
                 ),
@@ -720,7 +720,7 @@ class _ZoneDetailViewState extends State<ZoneDetailView> {
                 final error = snapshot.error;
                 return EmptyState(
                   icon: Iconsax.warning_2,
-                  title: 'Could not load this zone',
+                  title: 'Could not load this headquarter',
                   message: error is AppException
                       ? error.message
                       : 'Try again in a moment.',
@@ -731,7 +731,7 @@ class _ZoneDetailViewState extends State<ZoneDetailView> {
                 from: widget.from,
                 to: widget.to,
                 figures: snapshot.data!,
-                gutter: AppLayout.gutter(size),
+                gutter: AppLayout.gutterOf(context),
               );
             },
           ),
@@ -901,7 +901,7 @@ class _ZoneBodyState extends State<_ZoneBody> {
             count: '$missed',
             body: missed == 0
                 ? Text(
-                    'Every contact in this zone was visited.',
+                    'Every contact in this headquarter was visited.',
                     style: text.bodyMedium?.copyWith(color: p.inkMuted),
                   )
                 : ListView(
@@ -1019,10 +1019,10 @@ class _StatsPageState extends State<_StatsPage> {
               final data = snapshot.data!;
               return Padding(
                 padding: EdgeInsets.fromLTRB(
-                  AppLayout.gutter(size),
+                  AppLayout.gutterOf(context),
                   0,
-                  AppLayout.gutter(size),
-                  AppLayout.gutter(size),
+                  AppLayout.gutterOf(context),
+                  AppLayout.gutterOf(context),
                 ),
                 child: Column(
                   children: [

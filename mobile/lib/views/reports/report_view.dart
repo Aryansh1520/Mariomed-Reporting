@@ -90,7 +90,7 @@ class _ReportViewState extends State<ReportView> {
                 onRefresh: _refresh,
                 child: _ReportBody(
                   data: snapshot.data!,
-                  gutter: AppLayout.gutter(size),
+                  gutter: AppLayout.gutterOf(context),
                   onPlanToday: _kind == ReportKind.missed ? _planToday : null,
                 ),
               );

@@ -72,8 +72,8 @@ PERMISSIONS: tuple[PermissionDefinition, ...] = (
     PermissionDefinition(Perm.USERS_MANAGE, "Add, edit, activate or deactivate team members", "Team", True, Perm.USERS_READ),
     PermissionDefinition(Perm.TEAMS_READ, "View teams and their members", "Teams", True),
     PermissionDefinition(Perm.TEAMS_MANAGE, "Create, rename, archive teams and change membership", "Teams", True, Perm.TEAMS_READ),
-    PermissionDefinition(Perm.TERRITORIES_READ, "View zones and subzones", "Territories", True),
-    PermissionDefinition(Perm.TERRITORIES_MANAGE, "Create, edit, deactivate zones and subzones and assign users to them", "Territories", True, Perm.TERRITORIES_READ),
+    PermissionDefinition(Perm.TERRITORIES_READ, "View headquarters and patches", "Territories", True),
+    PermissionDefinition(Perm.TERRITORIES_MANAGE, "Create, edit, deactivate headquarters and patches and assign users to them", "Territories", True, Perm.TERRITORIES_READ),
     PermissionDefinition(Perm.PRODUCTS_READ, "View the product catalogue", "Products", False),
     PermissionDefinition(Perm.PRODUCTS_MANAGE, "Add, edit and deactivate products", "Products", False, Perm.PRODUCTS_READ),
     PermissionDefinition(Perm.CONTACTS_READ, "View contacts and their interaction history", "Contacts", True),
@@ -100,7 +100,7 @@ PERMISSIONS: tuple[PermissionDefinition, ...] = (
     PermissionDefinition(Perm.DATA_IMPORT, "Import users, products, contacts and targets from files", "Data", False),
     PermissionDefinition(Perm.SETTINGS_MANAGE, "Change system configuration and master values", "Settings", False),
     PermissionDefinition(Perm.AUDIT_READ, "View administrative and operational history", "Audit", False),
-    PermissionDefinition(Perm.ADMIN_DASHBOARD, "View team-wide reports by employee, zone, product and category", "Admin", False),
+    PermissionDefinition(Perm.ADMIN_DASHBOARD, "View team-wide reports by employee, headquarter, product and category", "Admin", False),
     PermissionDefinition(Perm.ROLES_MANAGE, "View and change roles", "Roles", False),
 )
 

@@ -13,6 +13,7 @@ import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/loading_list.dart';
 // import '../../core/widgets/territory_map.dart';  // map is commented out
 import '../../models/territory.dart';
+import '../../services/app_exception.dart';
 import '../../services/auth_service.dart';
 
 /// While zones are being browsed the map is a strip at the top and the zone list takes the rest.
@@ -30,7 +31,7 @@ class TerritoriesView extends GetView<TerritoriesController> {
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
-        title: const Text('Zones'),
+        title: const Text('Headquarters'),
         actions: [
           if (canManage)
             _HeaderActions(onNewSubzone: () => _pickZoneForSubzone(context)),
@@ -41,7 +42,9 @@ class TerritoriesView extends GetView<TerritoriesController> {
           constraints: BoxConstraints(
             maxWidth: AppLayout.contentMaxWidth(size),
           ),
-          child: Obx(() => _body(context, canManage, AppLayout.gutter(size))),
+          child: Obx(
+            () => _body(context, canManage, AppLayout.gutterOf(context)),
+          ),
         ),
       ),
     );
@@ -72,20 +75,20 @@ class TerritoriesView extends GetView<TerritoriesController> {
   Future<void> _pickZoneForSubzone(BuildContext context) async {
     if (controller.zones.isEmpty) {
       await AppDialogs.info(
-        'Draw a zone first',
-        'A subzone sits inside a zone. Create a zone, then its subzones.',
+        'Draw a headquarter first',
+        'A patch sits inside a headquarter. Create a headquarter, then its patches.',
       );
       return;
     }
     final zoneId = await AppDialogs.choose<int>(
-      title: 'Which zone?',
+      title: 'Which headquarter?',
       choices: [
         for (final zone in controller.zones)
           AppChoice<int>(
             value: zone.id,
             label: zone.name,
             icon: Iconsax.location,
-            description: '${controller.subzonesOf(zone.id).length} subzones',
+            description: '${controller.subzonesOf(zone.id).length} patches',
           ),
       ],
     );
@@ -133,7 +136,7 @@ class _MapCard extends GetView<TerritoriesController> {
           ),
           const SizedBox(height: AppSpace.s),
           Text(
-            controller.isDrawing ? _drawHint() : 'Pinch to zoom. Zones are cut to the map boundary.',
+            controller.isDrawing ? _drawHint() : 'Pinch to zoom. Headquarters are cut to the map boundary.',
             style: text.bodySmall?.copyWith(color: p.inkMuted),
             textAlign: TextAlign.center,
           ),
@@ -145,7 +148,7 @@ class _MapCard extends GetView<TerritoriesController> {
   }
 
   String _drawHint() {
-    final kind = controller.drawKind == TerritoryKind.zone ? 'zone' : 'subzone';
+    final kind = controller.drawKind == TerritoryKind.zone ? 'headquarter' : 'patch';
     final how = controller.freehand ? 'Drag on the map to draw.' : 'Tap the map to place points.';
     final editing = controller.editing;
     if (editing != null) return 'Reshaping ${editing.name}. Change its outline, then Finish.';
@@ -170,13 +173,13 @@ class _HeaderActions extends GetView<TerritoriesController> {
           mainAxisSize: MainAxisSize.min,
           children: [
             IconButton(
-              tooltip: 'New zone',
+              tooltip: 'New headquarter',
               onPressed: () =>
                   controller.createByName(kind: TerritoryKind.zone),
               icon: const Icon(Iconsax.add_square),
             ),
             IconButton(
-              tooltip: 'New subzone',
+              tooltip: 'New patch',
               onPressed: onNewSubzone,
               icon: const Icon(Iconsax.grid_1),
             ),
@@ -221,13 +224,23 @@ class _TerritoryPanel extends GetView<TerritoriesController> {
 
   final bool canManage;
 
+  /// Reloads the headquarters and patches. A failure is shown, and the list on screen stays as it was.
+  Future<void> _refresh(BuildContext context) async {
+    try {
+      await controller.refreshMap();
+    } on AppException catch (e) {
+      if (context.mounted) {
+        await AppDialogs.error('Could not refresh', e.message);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
     final text = Theme.of(context).textTheme;
 
     return Obx(() {
-      final rows = _rows();
       return Container(
         decoration: BoxDecoration(
           color: p.surface,
@@ -251,7 +264,7 @@ class _TerritoryPanel extends GetView<TerritoriesController> {
                   children: [
                     Expanded(
                       child: Text(
-                        'Zones',
+                        'Headquarters',
                         style: text.titleMedium?.copyWith(
                           fontWeight: FontWeight.w800,
                         ),
@@ -265,26 +278,42 @@ class _TerritoryPanel extends GetView<TerritoriesController> {
                 ),
               ),
               Expanded(
-                child: rows.isEmpty
-                    ? Padding(
-                        padding: const EdgeInsets.fromLTRB(
-                          AppSpace.l,
-                          0,
-                          AppSpace.l,
-                          AppSpace.l,
-                        ),
-                        child: Text(
-                          'Nothing drawn yet.',
-                          style: text.bodyMedium?.copyWith(color: p.inkMuted),
-                        ),
-                      )
-                    : ListView.separated(
-                        padding: EdgeInsets.zero,
-                        itemCount: rows.length,
-                        separatorBuilder: (context, index) =>
-                            Divider(height: 1, color: p.border),
-                        itemBuilder: (context, index) => rows[index],
-                      ),
+                child: RefreshIndicator(
+                  onRefresh: () => _refresh(context),
+                  child: ListView.separated(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: EdgeInsets.zero,
+                    itemCount: controller.zones.isEmpty
+                        ? 1
+                        : controller.zones.length,
+                    separatorBuilder: (context, index) =>
+                        Divider(height: 1, color: p.border),
+                    itemBuilder: (context, index) {
+                      if (controller.zones.isEmpty) {
+                        return Padding(
+                          padding: const EdgeInsets.fromLTRB(
+                            AppSpace.l,
+                            0,
+                            AppSpace.l,
+                            AppSpace.l,
+                          ),
+                          child: Text(
+                            'Nothing drawn yet.',
+                            style: text.bodyMedium?.copyWith(color: p.inkMuted),
+                          ),
+                        );
+                      }
+                      final zone = controller.zones[index];
+                      return _ZoneAccordion(
+                        zone: zone,
+                        subzones: controller.subzonesOf(zone.id),
+                        canManage: canManage,
+                        onEdit: controller.renameTerritory,
+                        onDelete: controller.deleteTerritory,
+                      );
+                    },
+                  ),
+                ),
               ),
             ],
           ),
@@ -292,29 +321,132 @@ class _TerritoryPanel extends GetView<TerritoriesController> {
       );
     });
   }
-
-  List<Widget> _rows() => [
-    for (final zone in controller.zones) ...[
-      _TerritoryRow(
-        territory: zone,
-        canManage: canManage,
-        onEdit: controller.renameTerritory,
-        onDelete: controller.deleteTerritory,
-      ),
-      for (final subzone in controller.subzonesOf(zone.id))
-        _TerritoryRow(
-          territory: subzone,
-          canManage: canManage,
-          onEdit: controller.renameTerritory,
-          onDelete: controller.deleteTerritory,
-        ),
-    ],
-  ];
 }
 
-/// One zone or subzone. Tapping the row opens its contacts. A zone carries a bar in its colour; a subzone is indented under it.
-class _TerritoryRow extends StatelessWidget {
-  const _TerritoryRow({
+/// A headquarter that opens to show its patches. The header carries the colour bar, the name and the patch count.
+/// Its actions sit at the top of the opened section, where they wrap onto new lines on narrow phones.
+class _ZoneAccordion extends StatelessWidget {
+  const _ZoneAccordion({
+    required this.zone,
+    required this.subzones,
+    required this.canManage,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final Territory zone;
+  final List<Territory> subzones;
+  final bool canManage;
+  final ValueChanged<Territory> onEdit;
+  final ValueChanged<Territory> onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final text = Theme.of(context).textTheme;
+    final colour = territoryHue(zone.colorIndex);
+    final count = subzones.length;
+
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        key: PageStorageKey<int>(zone.id),
+        tilePadding: const EdgeInsets.symmetric(
+          horizontal: AppSpace.l,
+          vertical: AppSpace.xs,
+        ),
+        childrenPadding: const EdgeInsets.fromLTRB(
+          AppSpace.l,
+          0,
+          AppSpace.l,
+          AppSpace.m,
+        ),
+        shape: const Border(),
+        collapsedShape: const Border(),
+        iconColor: p.inkMuted,
+        collapsedIconColor: p.inkMuted,
+        title: Row(
+          children: [
+            Container(
+              width: 4,
+              height: 40,
+              decoration: BoxDecoration(
+                color: colour,
+                borderRadius: AppRadius.pill,
+              ),
+            ),
+            const SizedBox(width: AppSpace.m),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    zone.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: text.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  Text(
+                    count == 1 ? '1 patch' : '$count patches',
+                    style: text.labelSmall?.copyWith(color: p.inkMuted),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        children: [
+          Wrap(
+            spacing: AppSpace.s,
+            runSpacing: AppSpace.xs,
+            children: [
+              TextButton.icon(
+                onPressed: () =>
+                    Get.toNamed(AppRoutes.territoryContacts, arguments: zone),
+                icon: const Icon(Iconsax.people, size: 18),
+                label: const Text('Contacts'),
+              ),
+              if (canManage)
+                TextButton.icon(
+                  onPressed: () => onEdit(zone),
+                  icon: const Icon(Iconsax.edit_2, size: 18),
+                  label: const Text('Rename'),
+                ),
+              if (canManage)
+                TextButton.icon(
+                  onPressed: () => onDelete(zone),
+                  style: TextButton.styleFrom(foregroundColor: p.alert),
+                  icon: const Icon(Iconsax.trash, size: 18),
+                  label: const Text('Delete'),
+                ),
+            ],
+          ),
+          if (subzones.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: AppSpace.s),
+              child: Text(
+                'No patches yet.',
+                style: text.bodyMedium?.copyWith(color: p.inkMuted),
+              ),
+            ),
+          for (final subzone in subzones)
+            _PatchRow(
+              territory: subzone,
+              canManage: canManage,
+              onEdit: onEdit,
+              onDelete: onDelete,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One patch inside a headquarter. Tapping it opens its contacts.
+class _PatchRow extends StatelessWidget {
+  const _PatchRow({
     required this.territory,
     required this.canManage,
     required this.onEdit,
@@ -330,72 +462,48 @@ class _TerritoryRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     final text = Theme.of(context).textTheme;
-    final isZone = territory.kind == TerritoryKind.zone;
     final colour = territoryHue(territory.colorIndex);
 
     return InkWell(
+      borderRadius: AppRadius.md,
       onTap: () =>
           Get.toNamed(AppRoutes.territoryContacts, arguments: territory),
       child: Padding(
-        padding: EdgeInsets.fromLTRB(
-          isZone ? AppSpace.l : AppSpace.xl + AppSpace.m,
-          AppSpace.m,
-          AppSpace.xs,
-          AppSpace.m,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpace.s,
+          vertical: AppSpace.s,
         ),
         child: Row(
           children: [
-            if (isZone)
-              Container(
-                width: 4,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: colour,
-                  borderRadius: AppRadius.pill,
-                ),
-              )
-            else
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: colour,
-                  shape: BoxShape.circle,
-                ),
-              ),
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(color: colour, shape: BoxShape.circle),
+            ),
             const SizedBox(width: AppSpace.m),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    territory.name,
-                    style: isZone
-                        ? text.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          )
-                        : text.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
-                  ),
-                  Text(
-                    isZone ? 'Zone' : 'Subzone',
-                    style: text.labelSmall?.copyWith(color: p.inkMuted),
-                  ),
-                ],
+              child: Text(
+                territory.name,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: text.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
               ),
             ),
             if (canManage)
               IconButton(
-                tooltip: 'Edit',
+                tooltip: 'Rename',
+                visualDensity: VisualDensity.compact,
                 onPressed: () => onEdit(territory),
                 icon: Icon(Iconsax.edit_2, size: 18, color: p.primary),
               ),
             if (canManage)
               IconButton(
                 tooltip: 'Delete',
+                visualDensity: VisualDensity.compact,
                 onPressed: () => onDelete(territory),
                 icon: Icon(Iconsax.trash, size: 18, color: p.alert),
               ),
-            Icon(Iconsax.arrow_right_3, size: 18, color: p.inkMuted),
+            Icon(Iconsax.arrow_right_3, size: 16, color: p.inkMuted),
           ],
         ),
       ),

@@ -31,20 +31,31 @@ class AuthService {
 
   /// Runs once at startup. A stored token that the server no longer accepts is dropped.
   Future<void> restoreSession() async {
+    await signInWithStoredSession();
+  }
+
+  Future<bool> hasStoredSession() async => await _tokenStore.read() != null;
+
+  /// Signs in with the token kept by Remember me. Returns false, and drops the token, when the server refuses it.
+  Future<bool> signInWithStoredSession() async {
     final token = await _tokenStore.read();
-    if (token == null) return;
+    if (token == null) return false;
     _api.setAccessToken(token);
     try {
       await _fetchCurrentUser();
+      return true;
     } on AppException {
       _api.setAccessToken(null);
       await _tokenStore.delete();
+      return false;
     }
   }
 
+  /// Without [rememberMe] the session lasts until the app closes: the token is not written to storage.
   Future<CurrentUser> signIn({
     required String identifier,
     required String password,
+    required bool rememberMe,
   }) async {
     final session = await _api.postData<LoginSession>(
       '/auth/login',
@@ -54,7 +65,11 @@ class AuthService {
     );
     _api.setAccessToken(session.accessToken);
     _currentUser = session.user;
-    await _tokenStore.write(session.accessToken);
+    if (rememberMe) {
+      await _tokenStore.write(session.accessToken);
+    } else {
+      await _tokenStore.delete();
+    }
     return session.user;
   }
 

@@ -31,6 +31,16 @@ abstract class AppLayout {
     ScreenSize.expanded => expandedMaxWidth,
   };
 
+  /// Phones narrower than this get a tighter gutter, so content keeps its room.
+  static const narrowBelow = 380.0;
+  static const narrowGutter = 12.0;
+
+  /// The side gutter for the screen the context is in. Narrow phones get [narrowGutter].
+  static double gutterOf(BuildContext context) {
+    if (MediaQuery.sizeOf(context).width < narrowBelow) return narrowGutter;
+    return gutter(sizeOf(context));
+  }
+
   static double gutter(ScreenSize size) => switch (size) {
     ScreenSize.compact => 16,
     ScreenSize.medium => 24,

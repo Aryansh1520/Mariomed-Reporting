@@ -72,7 +72,8 @@ class ReportService {
             for (final item in planned)
               ReportRow(
                 title: item.contactName,
-                subtitle: '${contactKind(item.categoryName, item.typeName)}  ·  ${item.subzoneName}',
+                subtitle:
+                    '${contactKind(item.categoryName, item.typeName)}  ·  ${item.subzoneName}',
                 trailing: _planLabel(item.status),
                 tone: _planTone(item.status),
               ),

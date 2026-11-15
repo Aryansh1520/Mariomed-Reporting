@@ -53,8 +53,9 @@ class ManageActions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
+    // A Wrap moves the actions onto a second line on narrow cards, instead of running past the edge.
+    return Wrap(
+      alignment: WrapAlignment.end,
       children: [
         if (onTypes != null)
           TextButton.icon(

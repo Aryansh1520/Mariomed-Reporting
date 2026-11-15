@@ -25,9 +25,7 @@ class ResetPasswordView extends GetView<ResetPasswordController> {
         padding: EdgeInsets.all(gutter),
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: AppLayout.formMaxWidth,
-            ),
+            constraints: const BoxConstraints(maxWidth: AppLayout.formMaxWidth),
             child: Container(
               padding: const EdgeInsets.all(AppSpace.xl),
               decoration: BoxDecoration(

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -11,6 +12,9 @@ import '../core/theme/app_system_ui.dart';
 import '../core/theme/app_theme.dart';
 import '../services/app_theme_service.dart';
 import '../services/auth_service.dart';
+import '../services/biometric_service.dart';
+import '../services/login_memory.dart';
+import 'app_refresh.dart';
 import 'bindings/initial_binding.dart';
 import 'routes/app_pages.dart';
 import 'routes/app_routes.dart';
@@ -58,11 +62,18 @@ class _AppState extends State<App> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state != AppLifecycleState.resumed) return;
     final auth = Get.find<AuthService>();
-    if (auth.isSignedIn) auth.refreshCurrentUser().catchError((_) {});
+    if (!auth.isSignedIn) return;
+    auth.refreshCurrentUser().catchError((_) {});
+    AppRefresh.run();
   }
 
   /// Restores a saved session. Nobody is signed in automatically: without a saved session the login screen shows.
+  /// With fingerprint or face sign-in on, the saved session waits for the login screen's biometric check.
   Future<void> _restoreSession() async {
+    final biometricsOn =
+        await Get.find<LoginMemory>().readBiometricSignIn() &&
+        await Get.find<BiometricService>().isAvailable();
+    if (biometricsOn) return;
     await Get.find<AuthService>().restoreSession();
   }
 
@@ -108,7 +119,11 @@ class _AppState extends State<App> with WidgetsBindingObserver {
             child: BackspaceBack(
               child: ShadTheme(
                 data: AppTheme.shad(p),
-                child: child ?? const SizedBox.shrink(),
+                // The system bars are transparent (edge-to-edge), so routes must stop above the bottom bar.
+                child: SafeArea(
+                  top: false,
+                  child: child ?? const SizedBox.shrink(),
+                ),
               ),
             ),
           );
@@ -118,15 +133,25 @@ class _AppState extends State<App> with WidgetsBindingObserver {
   }
 }
 
-/// Linux desktop has no back button, so Backspace goes back to the previous screen.
-/// A text field keeps Backspace for itself, because it handles the key before this does.
+/// Desktop has no back button, so Backspace goes back to the previous screen.
+/// Phones have a back button and a keyboard Backspace that must only delete text, so this does nothing there.
+/// Backspace stays with a text field that has focus, even an empty one, so typing never leaves a form.
 class BackspaceBack extends StatelessWidget {
   const BackspaceBack({super.key, required this.child});
 
   final Widget child;
 
+  static bool get _isDesktop =>
+      !kIsWeb &&
+      const {
+        TargetPlatform.linux,
+        TargetPlatform.macOS,
+        TargetPlatform.windows,
+      }.contains(defaultTargetPlatform);
+
   @override
   Widget build(BuildContext context) {
+    if (!_isDesktop) return child;
     return Focus(
       autofocus: true,
       onKeyEvent: (node, event) {
@@ -134,12 +159,20 @@ class BackspaceBack extends StatelessWidget {
             event.logicalKey != LogicalKeyboardKey.backspace) {
           return KeyEventResult.ignored;
         }
-        if (Get.key.currentState?.canPop() != true)
+        if (_isTyping() || Get.key.currentState?.canPop() != true) {
           return KeyEventResult.ignored;
+        }
         Get.back<void>();
         return KeyEventResult.handled;
       },
       child: child,
     );
+  }
+
+  static bool _isTyping() {
+    final context = FocusManager.instance.primaryFocus?.context;
+    return context != null &&
+        (context.widget is EditableText ||
+            context.findAncestorWidgetOfExactType<EditableText>() != null);
   }
 }

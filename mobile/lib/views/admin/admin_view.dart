@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 
@@ -193,8 +194,8 @@ class _UserRow extends StatelessWidget {
     );
     if (saved == true && context.mounted) {
       await AppDialogs.success(
-        'Zones saved',
-        '${user.fullName} is now assigned to the chosen zones and subzones.',
+        'Headquarters saved',
+        '${user.fullName} is now assigned to the chosen headquarters and patches.',
       );
     }
   }
@@ -239,7 +240,7 @@ class _UserRow extends StatelessWidget {
             ),
             if (canAssign)
               IconButton(
-                tooltip: 'Zones and subzones',
+                tooltip: 'Headquarters and patches',
                 icon: const Icon(Iconsax.location, size: 20),
                 onPressed: () => _openTerritories(context),
               ),
@@ -468,7 +469,8 @@ class _AddPersonSheetState extends State<_AddPersonSheet> {
               const SizedBox(height: AppSpace.m),
               TextField(
                 controller: _mobile,
-                keyboardType: TextInputType.phone,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 decoration: const InputDecoration(labelText: 'Mobile'),
               ),
               const SizedBox(height: AppSpace.m),

@@ -44,20 +44,24 @@ class AdminService {
         body: {'is_active': isActive},
       );
 
-  Future<List<Territory>> listTerritories() =>
-      _api.getData<List<Territory>>('/territories/map', (data) {
-        final items = ApiService.asJsonMap(data)['territories'] as List<Object?>;
-        return [
-          for (final item in items)
-            Territory.fromJson(ApiService.asJsonMap(item)),
-        ];
-      });
+  Future<List<Territory>> listTerritories() => _api.getData<List<Territory>>(
+    '/territories/map',
+    (data) {
+      final items = ApiService.asJsonMap(data)['territories'] as List<Object?>;
+      return [
+        for (final item in items)
+          Territory.fromJson(ApiService.asJsonMap(item)),
+      ];
+    },
+  );
 
-  Future<List<int>> listUserTerritoryIds(int userId) =>
-      _api.getData<List<int>>('/territories/users/$userId', (data) {
-        final ids = ApiService.asJsonMap(data)['territory_ids'] as List<Object?>;
-        return [for (final id in ids) id as int];
-      });
+  Future<List<int>> listUserTerritoryIds(int userId) => _api.getData<List<int>>(
+    '/territories/users/$userId',
+    (data) {
+      final ids = ApiService.asJsonMap(data)['territory_ids'] as List<Object?>;
+      return [for (final id in ids) id as int];
+    },
+  );
 
   /// Replaces the whole list: the zones and subzones not sent are taken away.
   Future<void> setUserTerritoryIds(int userId, List<int> territoryIds) =>

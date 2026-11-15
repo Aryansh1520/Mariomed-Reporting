@@ -9,7 +9,8 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://fs:fs_dev_password@localhost:5452/field_sales"
 
     # Sessions are opaque tokens checked on every request, so deactivating a user takes effect at once.
-    session_hours: int = 12
+    # Seven days, so field reps re-enter their password once a week; fingerprint sign-in covers the rest.
+    session_hours: int = 168
 
     # Password for the demo accounts that `python -m app.db.seed` creates. Development only.
     seed_password: str = "demo1234"

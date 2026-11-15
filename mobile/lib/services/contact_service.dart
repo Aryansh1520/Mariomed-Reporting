@@ -108,15 +108,12 @@ class ContactService {
   );
 
   /// Renames a type or switches it on or off. Only the fields given are changed.
-  Future<ContactType> updateType(
-    int typeId, {
-    String? name,
-    bool? isActive,
-  }) => _api.patchData<ContactType>(
-    '/contacts/types/$typeId',
-    (data) => ContactType.fromJson(ApiService.asJsonMap(data)),
-    body: {'name': ?name, 'is_active': ?isActive},
-  );
+  Future<ContactType> updateType(int typeId, {String? name, bool? isActive}) =>
+      _api.patchData<ContactType>(
+        '/contacts/types/$typeId',
+        (data) => ContactType.fromJson(ApiService.asJsonMap(data)),
+        body: {'name': ?name, 'is_active': ?isActive},
+      );
 
   Future<ContactCategory> createCategory(String name) =>
       _api.postData<ContactCategory>(

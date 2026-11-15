@@ -93,9 +93,9 @@ class EmployeeLine {
     required this.calls,
     required this.contactsVisited,
     required this.daysReported,
+    required this.daysLeave,
     required this.workingDays,
     required this.avgCallsPerDay,
-    required this.plannedDue,
     required this.missedCalls,
   });
 
@@ -105,9 +105,9 @@ class EmployeeLine {
     calls: json['calls'] as int,
     contactsVisited: json['contacts_visited'] as int,
     daysReported: json['days_reported'] as int,
+    daysLeave: json['days_leave'] as int,
     workingDays: json['working_days'] as int,
     avgCallsPerDay: (json['avg_calls_per_day'] as num).toDouble(),
-    plannedDue: json['planned_due'] as int,
     missedCalls: json['missed_calls'] as int,
   );
 
@@ -116,9 +116,9 @@ class EmployeeLine {
   final int calls;
   final int contactsVisited;
   final int daysReported;
+  final int daysLeave;
   final int workingDays;
   final double avgCallsPerDay;
-  final int plannedDue;
   final int missedCalls;
 }
 

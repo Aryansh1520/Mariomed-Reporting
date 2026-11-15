@@ -36,7 +36,7 @@ class VisitRecordView extends GetView<VisitRecordController> {
           constraints: BoxConstraints(
             maxWidth: AppLayout.contentMaxWidth(size),
           ),
-          child: Obx(() => _body(context, AppLayout.gutter(size))),
+          child: Obx(() => _body(context, AppLayout.gutterOf(context))),
         ),
       ),
     );

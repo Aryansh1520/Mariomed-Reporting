@@ -51,7 +51,7 @@ class HomeView extends GetView<HomeController> {
         final dashboard = controller.dashboard;
         final isAdmin = Get.find<AuthService>().can('admin.dashboard');
         final team = Get.find<TeamDashboardController>();
-        final gutter = AppLayout.gutter(size);
+        final gutter = AppLayout.gutterOf(context);
         return Center(
           child: ConstrainedBox(
             constraints: BoxConstraints(

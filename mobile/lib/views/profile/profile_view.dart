@@ -26,7 +26,7 @@ class ProfileView extends GetView<HomeController> {
             maxWidth: AppLayout.contentMaxWidth(size),
           ),
           child: ListView(
-            padding: EdgeInsets.all(AppLayout.gutter(size)),
+            padding: EdgeInsets.all(AppLayout.gutterOf(context)),
             children: [
               if (user != null)
                 _IdentityCard(name: user.fullName, email: user.email),

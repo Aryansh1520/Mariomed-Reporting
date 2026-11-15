@@ -49,7 +49,7 @@ class CategoryTypesView extends GetView<CategoriesController> {
           constraints: BoxConstraints(
             maxWidth: AppLayout.contentMaxWidth(size),
           ),
-          child: Obx(() => _body(canManage, AppLayout.gutter(size))),
+          child: Obx(() => _body(canManage, AppLayout.gutterOf(context))),
         ),
       ),
     );

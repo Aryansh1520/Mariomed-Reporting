@@ -73,13 +73,18 @@ class _UserTerritoriesSheetState extends State<UserTerritoriesSheet> {
       ..sort((a, b) => a.name.compareTo(b.name));
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(AppSpace.l, 0, AppSpace.l, AppSpace.l),
+        padding: const EdgeInsets.fromLTRB(
+          AppSpace.l,
+          0,
+          AppSpace.l,
+          AppSpace.l,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Zones and subzones',
+              'Headquarters and patches',
               style: text.titleMedium?.copyWith(fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: AppSpace.xs),
@@ -110,7 +115,7 @@ class _UserTerritoriesSheetState extends State<UserTerritoriesSheet> {
     }
     if (zones.isEmpty) {
       return Text(
-        'No zones yet. Create them on the Territories screen first.',
+        'No headquarters yet. Create them on the Territories screen first.',
         style: text.bodyMedium?.copyWith(color: p.inkMuted),
       );
     }
@@ -130,7 +135,9 @@ class _UserTerritoriesSheetState extends State<UserTerritoriesSheet> {
 
   List<Territory> _subzonesOf(Territory zone) =>
       _options
-          .where((t) => t.kind == TerritoryKind.subzone && t.parentId == zone.id)
+          .where(
+            (t) => t.kind == TerritoryKind.subzone && t.parentId == zone.id,
+          )
           .toList()
         ..sort((a, b) => a.name.compareTo(b.name));
 

@@ -23,10 +23,10 @@ from app.modules.territories.schemas import (
 from app.modules.users import service as users_service
 
 OUTSIDE_MAP = "This area is outside the map. Draw it over the service area."
-PARENT_NOT_ZONE = "Choose a zone to put this subzone in."
-OUTSIDE_ZONE = "Every point of a subzone must sit inside its zone."
+PARENT_NOT_ZONE = "Choose a headquarter to put this patch in."
+OUTSIDE_ZONE = "Every point of a patch must sit inside its headquarter."
 NOT_FOUND = "This territory does not exist."
-TERRITORY_NOT_FOUND = "One of the zones or subzones does not exist."
+TERRITORY_NOT_FOUND = "One of the headquarters or patches does not exist."
 USER_NOT_FOUND = "This user does not exist."
 
 

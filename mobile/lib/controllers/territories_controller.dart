@@ -83,16 +83,23 @@ class TerritoriesController extends GetxController {
     _isLoading.value = true;
     _loadError.value = null;
     try {
-      final data = await _service.fetchMap();
-      _features.assignAll(data.regions);
-      _territories.assignAll(data.territories);
-      _bounds = _boundsOf(data.regions);
-      _fitToTerritories();
+      await _fetchMap();
     } on AppException catch (e) {
       _loadError.value = e.message;
     } finally {
       _isLoading.value = false;
     }
+  }
+
+  /// Pull to refresh. The list stays on screen while the new data loads, and a failure is left to the caller.
+  Future<void> refreshMap() => _fetchMap();
+
+  Future<void> _fetchMap() async {
+    final data = await _service.fetchMap();
+    _features.assignAll(data.regions);
+    _territories.assignAll(data.territories);
+    _bounds = _boundsOf(data.regions);
+    _fitToTerritories();
   }
 
   void setFreehand(bool value) => _freehand.value = value;
@@ -156,7 +163,7 @@ class TerritoriesController extends GetxController {
       );
       return;
     }
-    final label = kind == TerritoryKind.zone ? 'zone' : 'subzone';
+    final label = kind == TerritoryKind.zone ? 'headquarter' : 'patch';
     final editing = _editing.value;
     if (editing != null) {
       await _saveEdit(editing, shape, label);
@@ -198,8 +205,8 @@ class TerritoriesController extends GetxController {
     if (subzones.isNotEmpty) {
       final confirmed = await AppDialogs.confirm(
         title:
-            'Delete ${subzones.length} subzone${subzones.length == 1 ? '' : 's'}?',
-        message: 'Editing a zone removes its subzones, because they were drawn inside the old outline.',
+            'Delete ${subzones.length} patch${subzones.length == 1 ? '' : 'es'}?',
+        message: 'Editing a headquarter removes its patches, because they were drawn inside the old outline.',
         confirmLabel: 'Save and delete',
         destructive: true,
       );
@@ -226,7 +233,7 @@ class TerritoriesController extends GetxController {
     required TerritoryKind kind,
     int? parentId,
   }) async {
-    final label = kind == TerritoryKind.zone ? 'zone' : 'subzone';
+    final label = kind == TerritoryKind.zone ? 'headquarter' : 'patch';
     final name = await AppDialogs.prompt(
       title: 'Name this $label',
       label: '$label name',
@@ -245,7 +252,9 @@ class TerritoriesController extends GetxController {
   }
 
   Future<void> renameTerritory(Territory territory) async {
-    final label = territory.kind == TerritoryKind.zone ? 'zone' : 'subzone';
+    final label = territory.kind == TerritoryKind.zone
+        ? 'headquarter'
+        : 'patch';
     final name = await AppDialogs.prompt(
       title: 'Rename this $label',
       label: '$label name',
@@ -270,7 +279,7 @@ class TerritoriesController extends GetxController {
       title: 'Delete ${territory.name}?',
       message: children.isEmpty
           ? 'Its contacts stop appearing and cannot be visited. Nothing is erased.'
-          : 'Its ${children.length} subzone${children.length == 1 ? '' : 's'} and their contacts are removed too. Nothing is erased.',
+          : 'Its ${children.length} patch${children.length == 1 ? '' : 'es'} and their contacts are removed too. Nothing is erased.',
       confirmLabel: 'Delete',
       destructive: true,
     );

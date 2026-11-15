@@ -114,11 +114,12 @@ def team_dashboard(db: Session, principal: Principal, start: date, end: date) ->
         )
         for reporter in reporters
     }
+    leave_by_user = Counter(day.user_id for day in days if day.status == "leave")
     return TeamDashboard(
         summary=_summary(visits, month_visits, ended, len(reporters), due, missed, coverage_total, working, period_days),
         daily=_daily(visits, month_visits, coverage_total, start, min(end, today)),
         employees=[
-            _employee(reporter, visits, month_visits, ended, due, coverage_by_user[reporter.user_id], working)
+            _employee(reporter, visits, month_visits, ended, coverage_by_user[reporter.user_id], working, leave_by_user)
             for reporter in reporters
         ],
         zones=_zones(db, visits, month_visits),
@@ -285,9 +286,9 @@ def _employee(
     visits: list[VisitRead],
     month_visits: list[VisitRead],
     ended,
-    due,
     coverage_total: int,
     working: dict[int, int],
+    leave_by_user: Counter,
 ) -> EmployeeLine:
     mine = [visit for visit in visits if visit.user_id == reporter.user_id]
     days = sum(1 for day in ended if day.user_id == reporter.user_id)
@@ -299,9 +300,9 @@ def _employee(
         calls=len(mine),
         contacts_visited=contacts,
         days_reported=days,
+        days_leave=leave_by_user[reporter.user_id],
         working_days=working_days,
         avg_calls_per_day=_average(len(mine), working_days),
-        planned_due=sum(1 for item in due if item[0] == reporter.user_id),
         missed_calls=max(0, coverage_total - contacts),
     )
 

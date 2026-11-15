@@ -11,7 +11,6 @@ class ProductFormView extends GetView<ProductFormController> {
 
   @override
   Widget build(BuildContext context) {
-    final size = AppLayout.sizeOf(context);
     final p = context.palette;
     final text = Theme.of(context).textTheme;
 
@@ -24,7 +23,7 @@ class ProductFormView extends GetView<ProductFormController> {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: AppLayout.formMaxWidth),
           child: ListView(
-            padding: EdgeInsets.all(AppLayout.gutter(size)),
+            padding: EdgeInsets.all(AppLayout.gutterOf(context)),
             children: [
               TextField(
                 controller: controller.name,

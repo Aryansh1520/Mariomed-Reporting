@@ -115,7 +115,7 @@ class _MemberDetailViewState extends State<MemberDetailView> {
                 from: _from,
                 to: _to,
                 selectedDay: _day,
-                gutter: AppLayout.gutter(size),
+                gutter: AppLayout.gutterOf(context),
                 onChanged: _reload,
                 onSelectDay: _selectDay,
                 onPeriodChanged: _changePeriod,
@@ -186,8 +186,8 @@ class _DetailBody extends StatelessWidget {
     final p = context.palette;
     final text = Theme.of(context).textTheme;
     final member = detail.member;
-    final callsByDay = {
-      for (final day in detail.days) DateUtils.dateOnly(day.day): day.calls,
+    final daysByDate = {
+      for (final day in detail.days) DateUtils.dateOnly(day.day): day,
     };
     return ListView(
       padding: EdgeInsets.fromLTRB(gutter, 0, gutter, AppSpace.xxl),
@@ -200,7 +200,7 @@ class _DetailBody extends StatelessWidget {
         _OverviewCard(member: member),
         const SizedBox(height: AppSpace.l),
         _ActivityCard(
-          cells: _lastSevenDays(callsByDay),
+          cells: _lastSevenDays(daysByDate),
           selectedDay: selectedDay,
           onDayTap: (day) => onSelectDay(selectedDay == day ? null : day),
           onViewCalendar: () => _openCalendar(context),
@@ -236,23 +236,34 @@ class _DetailBody extends StatelessWidget {
   }
 
   /// Seven days. They end on the selected day when there is one, otherwise on the period's last day.
-  List<_DayCell> _lastSevenDays(Map<DateTime, int> callsByDay) {
+  List<_DayCell> _lastSevenDays(Map<DateTime, DayLine> daysByDate) {
     final end = DateUtils.dateOnly(selectedDay ?? to);
     return [
       for (var offset = 6; offset >= 0; offset--)
         () {
           final day = end.subtract(Duration(days: offset));
-          return _DayCell(day: day, calls: callsByDay[day] ?? 0);
+          return _DayCell.from(day, daysByDate[day]);
         }(),
     ];
   }
 }
 
 class _DayCell {
-  const _DayCell({required this.day, required this.calls});
+  const _DayCell({
+    required this.day,
+    required this.calls,
+    required this.isLeave,
+  });
+
+  factory _DayCell.from(DateTime day, DayLine? line) => _DayCell(
+    day: day,
+    calls: line?.calls ?? 0,
+    isLeave: line?.status == 'leave',
+  );
 
   final DateTime day;
   final int calls;
+  final bool isLeave;
 }
 
 /// The coverage ring with the contacts count inside, and the four figures beside it.
@@ -261,13 +272,17 @@ class _OverviewCard extends StatelessWidget {
 
   final MemberRow member;
 
+  /// Below this card width the ring sits above the stats, so each label has room to wrap at word breaks.
+  static const _stackBelow = 420.0;
+
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final text = Theme.of(context).textTheme;
     final coverage = member.coverageTotal == 0
         ? 0.0
         : member.contactsVisited / member.coverageTotal;
+    final ring = _CoverageRing(member: member, coverage: coverage);
+    final stats = _statsGrid(p);
     return Container(
       padding: const EdgeInsets.all(AppSpace.l),
       decoration: BoxDecoration(
@@ -275,136 +290,154 @@ class _OverviewCard extends StatelessWidget {
         borderRadius: AppRadius.lg,
         boxShadow: AppEffects.card(p),
       ),
-      child: IntrinsicHeight(
-        child: Row(
-          children: [
-            Expanded(
-              flex: 2,
-              child: Column(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxWidth < _stackBelow) {
+            return Column(
+              children: [
+                ring,
+                Divider(height: AppSpace.l * 2, thickness: 1, color: p.border),
+                stats,
+              ],
+            );
+          }
+          return IntrinsicHeight(
+            child: Row(
+              children: [
+                Expanded(flex: 2, child: ring),
+                Container(
+                  width: 1,
+                  margin: const EdgeInsets.symmetric(horizontal: AppSpace.m),
+                  color: p.border,
+                ),
+                Expanded(flex: 3, child: stats),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// Four figures in two rows of two, each tile with the full width of its half.
+  Widget _statsGrid(AppPalette p) {
+    return Column(
+      children: [
+        IntrinsicHeight(
+          child: Row(
+            children: [
+              Expanded(
+                child: _StatTile(
+                  icon: Iconsax.call,
+                  accent: _Accent.blue,
+                  value: '${member.calls}',
+                  label: 'Calls',
+                ),
+              ),
+              Container(
+                width: 1,
+                margin: const EdgeInsets.symmetric(horizontal: AppSpace.s),
+                color: p.border,
+              ),
+              Expanded(
+                child: _StatTile(
+                  icon: Iconsax.calendar_tick,
+                  accent: _Accent.green,
+                  value: '${member.daysReported}',
+                  label: 'Days reported',
+                ),
+              ),
+            ],
+          ),
+        ),
+        Divider(height: AppSpace.l * 2, thickness: 1, color: p.border),
+        IntrinsicHeight(
+          child: Row(
+            children: [
+              Expanded(
+                child: _StatTile(
+                  icon: Iconsax.calendar_remove,
+                  accent: _Accent.orange,
+                  value: '${member.daysLeave}',
+                  label: 'Days on leave',
+                ),
+              ),
+              Container(
+                width: 1,
+                margin: const EdgeInsets.symmetric(horizontal: AppSpace.s),
+                color: p.border,
+              ),
+              Expanded(
+                child: _StatTile(
+                  icon: Iconsax.warning_2,
+                  accent: _Accent.red,
+                  value: '${member.daysNeverReported}',
+                  label: 'Days never reported',
+                  alert: true,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// The coverage ring with the contacts count inside, and the caption under it.
+class _CoverageRing extends StatelessWidget {
+  const _CoverageRing({required this.member, required this.coverage});
+
+  final MemberRow member;
+  final double coverage;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final text = Theme.of(context).textTheme;
+    return Column(
+      children: [
+        SizedBox(
+          width: 120,
+          height: 120,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              SizedBox.expand(
+                child: CircularProgressIndicator(
+                  value: coverage,
+                  strokeWidth: 12,
+                  strokeCap: StrokeCap.round,
+                  color: _Accent.blue.color,
+                  backgroundColor: p.border,
+                ),
+              ),
+              Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  SizedBox(
-                    width: 120,
-                    height: 120,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        SizedBox.expand(
-                          child: CircularProgressIndicator(
-                            value: coverage,
-                            strokeWidth: 12,
-                            strokeCap: StrokeCap.round,
-                            color: _Accent.blue.color,
-                            backgroundColor: p.border,
-                          ),
-                        ),
-                        Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              '${member.contactsVisited} of ${member.coverageTotal}',
-                              style: text.titleLarge?.copyWith(
-                                fontWeight: FontWeight.w800,
-                                color: p.ink,
-                              ),
-                            ),
-                            Text(
-                              '${(coverage * 100).toStringAsFixed(1)}%',
-                              style: text.bodyMedium?.copyWith(
-                                color: p.inkMuted,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+                  Text(
+                    '${member.contactsVisited} of ${member.coverageTotal}',
+                    style: text.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: p.ink,
                     ),
                   ),
-                  const SizedBox(height: AppSpace.s),
                   Text(
-                    'Contacts covered',
+                    '${(coverage * 100).toStringAsFixed(1)}%',
                     style: text.bodyMedium?.copyWith(color: p.inkMuted),
                   ),
                 ],
               ),
-            ),
-            Container(
-              width: 1,
-              margin: const EdgeInsets.symmetric(horizontal: AppSpace.m),
-              color: p.border,
-            ),
-            Expanded(
-              flex: 3,
-              child: Column(
-                children: [
-                  IntrinsicHeight(
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: _StatTile(
-                            icon: Iconsax.call,
-                            accent: _Accent.blue,
-                            value: '${member.calls}',
-                            label: 'Calls',
-                          ),
-                        ),
-                        Container(
-                          width: 1,
-                          margin: const EdgeInsets.symmetric(
-                            horizontal: AppSpace.s,
-                          ),
-                          color: p.border,
-                        ),
-                        Expanded(
-                          child: _StatTile(
-                            icon: Iconsax.calendar_tick,
-                            accent: _Accent.green,
-                            value: '${member.daysReported}',
-                            label: 'Days reported',
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Divider(
-                    height: AppSpace.l * 2,
-                    thickness: 1,
-                    color: p.border,
-                  ),
-                  IntrinsicHeight(
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: _StatTile(
-                            icon: Iconsax.calendar_remove,
-                            accent: _Accent.orange,
-                            value: '${member.daysLeave}',
-                            label: 'Days on leave',
-                          ),
-                        ),
-                        Container(
-                          width: 1,
-                          margin: const EdgeInsets.symmetric(
-                            horizontal: AppSpace.s,
-                          ),
-                          color: p.border,
-                        ),
-                        Expanded(
-                          child: _StatTile(
-                            icon: Iconsax.warning_2,
-                            accent: _Accent.red,
-                            value: '${member.daysNeverReported}',
-                            label: 'Days never reported',
-                            alert: true,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
-      ),
+        const SizedBox(height: AppSpace.s),
+        Text(
+          'Contacts covered',
+          textAlign: TextAlign.center,
+          style: text.bodyMedium?.copyWith(color: p.inkMuted),
+        ),
+      ],
     );
   }
 }
@@ -564,14 +597,23 @@ class _DayTile extends StatelessWidget {
     final p = context.palette;
     final text = Theme.of(context).textTheme;
     final hasCalls = cell.calls > 0;
+    final onLeave = !hasCalls && cell.isLeave;
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: AppSpace.s),
         decoration: BoxDecoration(
-          color: selected ? _Accent.blue.tint : p.surface,
+          color: selected
+              ? _Accent.blue.tint
+              : (onLeave ? _Accent.orange.tint : p.surface),
           borderRadius: AppRadius.md,
-          border: Border.all(color: selected ? _Accent.blue.color : p.border),
+          border: Border.all(
+            color: selected
+                ? _Accent.blue.color
+                : (onLeave
+                      ? _Accent.orange.color.withValues(alpha: 0.4)
+                      : p.border),
+          ),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -590,7 +632,13 @@ class _DayTile extends StatelessWidget {
               ),
             ),
             const SizedBox(height: AppSpace.xs),
-            if (hasCalls)
+            if (onLeave)
+              Icon(
+                Iconsax.calendar_remove,
+                size: 14,
+                color: _Accent.orange.color,
+              )
+            else if (hasCalls)
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -619,11 +667,13 @@ class _DayTile extends StatelessWidget {
             Text(
               hasCalls
                   ? '${cell.calls} ${cell.calls == 1 ? 'call' : 'calls'}'
-                  : 'No calls',
+                  : (onLeave ? 'On leave' : 'No calls'),
               style: text.bodySmall?.copyWith(
                 color: selected
                     ? _Accent.blue.color
-                    : (hasCalls ? p.ink : p.inkMuted),
+                    : (hasCalls
+                          ? p.ink
+                          : (onLeave ? _Accent.orange.color : p.inkMuted)),
                 fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
               ),
             ),
@@ -651,7 +701,7 @@ class _CalendarSheetState extends State<_CalendarSheet> {
 
   final DateTime _today = indiaToday();
   late DateTime _month = DateTime(_today.year, _today.month);
-  final Map<DateTime, Map<DateTime, int>> _cache = {};
+  final Map<DateTime, Map<DateTime, DayLine>> _cache = {};
   bool _loading = false;
   String? _error;
 
@@ -684,7 +734,7 @@ class _CalendarSheetState extends State<_CalendarSheet> {
       if (!mounted) return;
       if (month == _month) {
         _cache[month] = {
-          for (final day in detail.days) DateUtils.dateOnly(day.day): day.calls,
+          for (final day in detail.days) DateUtils.dateOnly(day.day): day,
         };
       }
     } on AppException catch (e) {
@@ -761,7 +811,7 @@ class _CalendarSheetState extends State<_CalendarSheet> {
               else
                 _MonthGrid(
                   month: _month,
-                  callsByDay: _cache[_month] ?? const {},
+                  daysByDate: _cache[_month] ?? const {},
                   today: _today,
                 ),
             ],
@@ -776,12 +826,12 @@ class _CalendarSheetState extends State<_CalendarSheet> {
 class _MonthGrid extends StatelessWidget {
   const _MonthGrid({
     required this.month,
-    required this.callsByDay,
+    required this.daysByDate,
     required this.today,
   });
 
   final DateTime month;
-  final Map<DateTime, int> callsByDay;
+  final Map<DateTime, DayLine> daysByDate;
   final DateTime today;
 
   static const _weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -834,7 +884,11 @@ class _MonthGrid extends StatelessWidget {
     final text = Theme.of(context).textTheme;
     final date = DateTime(month.year, month.month, dayNumber);
     final selectable = !date.isAfter(today);
-    final calls = callsByDay[date] ?? 0;
+    final line = daysByDate[date];
+    final calls = line?.calls ?? 0;
+    final onLeave = calls == 0 && line?.status == 'leave';
+    final accent = onLeave ? _Accent.orange : _Accent.blue;
+    final marked = calls > 0 || onLeave;
     return GestureDetector(
       onTap: selectable ? () => Navigator.of(context).pop(date) : null,
       child: Container(
@@ -842,12 +896,10 @@ class _MonthGrid extends StatelessWidget {
         margin: const EdgeInsets.all(2),
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: calls > 0 ? _Accent.blue.tint : null,
+          color: marked ? accent.tint : null,
           borderRadius: AppRadius.sm,
           border: Border.all(
-            color: calls > 0
-                ? _Accent.blue.color.withValues(alpha: 0.3)
-                : p.border,
+            color: marked ? accent.color.withValues(alpha: 0.3) : p.border,
           ),
         ),
         child: Column(
@@ -865,6 +917,14 @@ class _MonthGrid extends StatelessWidget {
                 '$calls',
                 style: text.labelSmall?.copyWith(
                   color: _Accent.blue.color,
+                  fontWeight: FontWeight.w700,
+                ),
+              )
+            else if (onLeave)
+              Text(
+                'Leave',
+                style: text.labelSmall?.copyWith(
+                  color: _Accent.orange.color,
                   fontWeight: FontWeight.w700,
                 ),
               ),

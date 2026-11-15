@@ -52,7 +52,7 @@ class CategoriesView extends GetView<CategoriesController> {
           constraints: BoxConstraints(
             maxWidth: AppLayout.contentMaxWidth(size),
           ),
-          child: Obx(() => _body(canManage, AppLayout.gutter(size))),
+          child: Obx(() => _body(canManage, AppLayout.gutterOf(context))),
         ),
       ),
     );
@@ -91,9 +91,8 @@ class CategoriesView extends GetView<CategoriesController> {
                   canManage: canManage,
                   onEdit: () => _rename(category),
                   onToggle: () => _toggleActive(category),
-                  onTypes: () => Get.to(
-                    () => CategoryTypesView(category: category),
-                  ),
+                  onTypes: () =>
+                      Get.to(() => CategoryTypesView(category: category)),
                 ),
             ],
           ),

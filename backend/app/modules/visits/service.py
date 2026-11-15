@@ -42,7 +42,7 @@ SUNDAY = 6
 NOT_REPORTER = "Only people who report their own calls can record them. Your access manages the team."
 PARTNER_NOT_FOUND = "The joint partner does not exist or is switched off."
 PARTNER_IS_SELF = "You cannot add yourself as the joint partner."
-PARTNER_OUTSIDE = "The joint partner must be assigned to the same zone or subzone."
+PARTNER_OUTSIDE = "The joint partner must be assigned to the same headquarter or patch."
 JOINT_NOT_FOUND = "This joint call does not exist."
 JOINT_CLOSED = "This joint call has already been answered."
 

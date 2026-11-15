@@ -77,20 +77,6 @@ abstract class AppTheme {
         margin: EdgeInsets.zero,
         shape: const RoundedRectangleBorder(borderRadius: AppRadius.lg),
       ),
-      navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: p.surface,
-        indicatorColor: p.primary.withValues(alpha: 0.14),
-        labelTextStyle: WidgetStatePropertyAll(
-          text.labelSmall?.copyWith(fontWeight: FontWeight.w700),
-        ),
-        iconTheme: WidgetStateProperty.resolveWith(
-          (states) => IconThemeData(
-            color: states.contains(WidgetState.selected)
-                ? p.primary
-                : p.inkMuted,
-          ),
-        ),
-      ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           backgroundColor: p.primary,

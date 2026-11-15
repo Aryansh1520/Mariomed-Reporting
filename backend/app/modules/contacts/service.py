@@ -33,8 +33,8 @@ TYPE_INACTIVE = "This type is switched off. Choose an active type."
 TYPE_OTHER_CATEGORY = "This type belongs to another category."
 CONTACT_NOT_FOUND = "This contact does not exist."
 CONTACT_INACTIVE = "This contact is switched off and cannot be visited."
-SUBZONE_NOT_FOUND = "Choose a subzone for this contact."
-SUBZONE_NOT_YOURS = "This subzone is not one of your territories."
+SUBZONE_NOT_FOUND = "Choose a patch for this contact."
+SUBZONE_NOT_YOURS = "This patch is not one of your territories."
 
 
 def list_categories(db: Session, principal: Principal) -> list[CategoryRead]:

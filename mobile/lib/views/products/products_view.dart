@@ -44,7 +44,7 @@ class ProductsView extends GetView<ProductsController> {
           constraints: BoxConstraints(
             maxWidth: AppLayout.contentMaxWidth(size),
           ),
-          child: Obx(() => _body(canManage, AppLayout.gutter(size))),
+          child: Obx(() => _body(canManage, AppLayout.gutterOf(context))),
         ),
       ),
     );
