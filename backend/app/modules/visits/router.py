@@ -13,6 +13,7 @@ from app.modules.visits.schemas import (
     JointPartnerRead,
     JointRequestRead,
     UnlistedCreate,
+    UnlistedDetailRead,
     UnlistedListQuery,
     UnlistedRead,
     UnlistedSimilarQuery,
@@ -87,6 +88,15 @@ def find_similar_unlisted(
     db: Session = Depends(get_db),
 ) -> list[UnlistedRead]:
     return service.find_similar_unlisted(db, principal, UnlistedSimilarQuery(subzone_id=subzone_id, name=name))
+
+
+@router.get("/unlisted-contacts/{unlisted_id}", response_model=UnlistedDetailRead)
+def unlisted_detail(
+    unlisted_id: int,
+    principal: Principal = Depends(get_principal),
+    db: Session = Depends(get_db),
+) -> UnlistedDetailRead:
+    return service.unlisted_detail(db, principal, unlisted_id)
 
 
 @router.post("/unlisted-contacts/{unlisted_id}/convert", response_model=UnlistedRead)

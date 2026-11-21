@@ -5,6 +5,9 @@ const _indiaOffset = Duration(hours: 5, minutes: 30);
 /// The current moment in India.
 DateTime indiaNow() => DateTime.now().toUtc().add(_indiaOffset);
 
+/// A moment the server sent, in India time.
+DateTime indiaTime(DateTime moment) => moment.toUtc().add(_indiaOffset);
+
 /// Today's date in India, with the time left out.
 DateTime indiaToday() {
   final now = indiaNow();

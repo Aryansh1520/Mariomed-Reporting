@@ -13,6 +13,7 @@ import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/loading_list.dart';
 import '../../models/unlisted.dart';
 import '../../services/auth_service.dart';
+import '../visits/unlisted_detail_sheet.dart';
 
 /// The unlisted doctors and chemists of one patch, with their calls, and the action to flag one as converted.
 class UnlistedPatchView extends GetView<UnlistedPatchController> {
@@ -82,11 +83,17 @@ class UnlistedPatchView extends GetView<UnlistedPatchController> {
                 children: [
                   for (var i = 0; i < controller.contacts.length; i++) ...[
                     if (i > 0) Divider(height: 1, color: p.border),
-                    _ContactStatRow(
-                      stat: controller.contacts[i],
-                      onConvert: canConvert
-                          ? () => _convert(context, controller.contacts[i])
-                          : null,
+                    InkWell(
+                      onTap: () => showUnlistedDetail(
+                        context,
+                        controller.contacts[i].unlistedId,
+                      ),
+                      child: _ContactStatRow(
+                        stat: controller.contacts[i],
+                        onConvert: canConvert
+                            ? () => _convert(context, controller.contacts[i])
+                            : null,
+                      ),
                     ),
                   ],
                 ],

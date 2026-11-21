@@ -5,6 +5,7 @@ import '../../core/theme/app_tokens.dart';
 import '../../core/utils/formatters.dart';
 import '../../models/contact.dart';
 import '../../models/team_dashboard.dart';
+import '../../models/unlisted.dart';
 
 /// One call in full, for the modal that opens from any call listing on the admin side.
 class CallDetail {
@@ -32,6 +33,21 @@ class CallDetail {
     repName: call.repName,
     zoneName: call.zoneName,
     isUnlisted: call.isUnlisted,
+  );
+
+  factory CallDetail.fromUnlistedCall(
+    UnlistedCallLine call,
+    UnlistedContact contact,
+  ) => CallDetail(
+    contactName: contact.name,
+    kind: contact.categoryName,
+    status: call.status,
+    visitDate: call.visitDate,
+    timeLabel: callTimeLabel(call.dayPart, call.visitTime),
+    products: call.products,
+    remarks: call.remarks,
+    repName: call.repName,
+    isUnlisted: true,
   );
 
   final String contactName;

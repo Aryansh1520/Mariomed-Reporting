@@ -12,6 +12,10 @@ class UnlistedContact {
     required this.subzoneId,
     required this.subzoneName,
     required this.status,
+    required this.addedBy,
+    required this.addedAt,
+    required this.convertedBy,
+    required this.convertedAt,
   });
 
   factory UnlistedContact.fromJson(Map<String, Object?> json) =>
@@ -25,6 +29,12 @@ class UnlistedContact {
         subzoneId: json['subzone_id'] as int,
         subzoneName: json['subzone_name'] as String,
         status: json['status'] as String,
+        addedBy: json['added_by'] as String?,
+        addedAt: DateTime.parse(json['added_at'] as String),
+        convertedBy: json['converted_by'] as String?,
+        convertedAt: json['converted_at'] == null
+            ? null
+            : DateTime.parse(json['converted_at'] as String),
       );
 
   final int id;
@@ -38,6 +48,14 @@ class UnlistedContact {
 
   /// unlisted while it is still in use; converted once the admin has flagged it.
   final String status;
+
+  /// Who added the contact, and when. The name is null when that user no longer exists.
+  final String? addedBy;
+  final DateTime addedAt;
+
+  /// Who flagged the contact as converted, and when. Null until it is converted.
+  final String? convertedBy;
+  final DateTime? convertedAt;
 
   bool get isConverted => status == 'converted';
 
@@ -147,4 +165,73 @@ class UnlistedContactStat {
   final DateTime? lastVisit;
 
   bool get isConverted => status == 'converted';
+}
+
+/// One unlisted contact in full: the contact, its totals, and the calls made on it, newest first.
+class UnlistedDetail {
+  const UnlistedDetail({
+    required this.unlisted,
+    required this.callsTotal,
+    required this.reps,
+    required this.lastVisit,
+    required this.calls,
+  });
+
+  factory UnlistedDetail.fromJson(Map<String, Object?> json) => UnlistedDetail(
+    unlisted: UnlistedContact.fromJson(
+      (json['unlisted'] as Map).cast<String, Object?>(),
+    ),
+    callsTotal: json['calls_total'] as int,
+    reps: json['reps'] as int,
+    lastVisit: json['last_visit'] == null
+        ? null
+        : DateTime.parse(json['last_visit'] as String),
+    calls: [
+      for (final item in json['calls'] as List<Object?>)
+        UnlistedCallLine.fromJson((item as Map).cast()),
+    ],
+  );
+
+  final UnlistedContact unlisted;
+  final int callsTotal;
+  final int reps;
+  final DateTime? lastVisit;
+  final List<UnlistedCallLine> calls;
+}
+
+/// One call on an unlisted contact.
+class UnlistedCallLine {
+  const UnlistedCallLine({
+    required this.visitId,
+    required this.visitDate,
+    this.visitTime,
+    required this.dayPart,
+    required this.repName,
+    required this.status,
+    required this.products,
+    required this.remarks,
+  });
+
+  factory UnlistedCallLine.fromJson(Map<String, Object?> json) =>
+      UnlistedCallLine(
+        visitId: json['visit_id'] as int,
+        visitDate: DateTime.parse(json['visit_date'] as String),
+        visitTime: json['visit_time'] as String?,
+        dayPart: json['day_part'] as String,
+        repName: json['rep_name'] as String,
+        status: json['status'] as String,
+        products: [
+          for (final name in json['products'] as List<Object?>) name as String,
+        ],
+        remarks: json['remarks'] as String,
+      );
+
+  final int visitId;
+  final DateTime visitDate;
+  final String? visitTime;
+  final String dayPart;
+  final String repName;
+  final String status;
+  final List<String> products;
+  final String remarks;
 }

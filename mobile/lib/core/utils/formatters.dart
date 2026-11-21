@@ -1,3 +1,5 @@
+import 'business_time.dart';
+
 /// "contacts.read" becomes "Contacts: read". Codes that do not match the pattern pass through unchanged.
 String permissionLabel(String code) {
   final parts = code.split('.');
@@ -47,6 +49,14 @@ const _monthNames = [
 /// A day as it reads on a form, such as "28 Oct 2026".
 String formatDay(DateTime day) =>
     '${day.day} ${_monthNames[day.month - 1]} ${day.year}';
+
+/// A moment as it reads on a form, such as "28 Oct 2026, 20:55", in India time.
+String formatMoment(DateTime moment) {
+  final local = indiaTime(moment);
+  final hour = local.hour.toString().padLeft(2, '0');
+  final minute = local.minute.toString().padLeft(2, '0');
+  return '${formatDay(local)}, $hour:$minute';
+}
 
 /// The name of the day of the week, such as "Saturday".
 String weekdayName(DateTime day) => const [

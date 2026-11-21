@@ -22,6 +22,8 @@ from app.modules.visits.models import UnlistedContact, Visit, VisitDay, VisitPar
 from app.modules.visits.schemas import (
     DayPart,
     DisputeDecision,
+    UnlistedCall,
+    UnlistedDetailRead,
     JointPartnerRead,
     JointRequestRead,
     ProductRef,
@@ -675,6 +677,7 @@ def _unlisted_read(db: Session, unlisted: UnlistedContact) -> UnlistedRead:
 
 def _unlisted_reads(db: Session, rows: list[tuple[UnlistedContact, str]]) -> list[UnlistedRead]:
     places = territories_service.subzone_locations(db, {row.subzone_id for row, _ in rows})
+    names = users_service.full_names(db, _who_ids(rows))
     return [
         UnlistedRead(
             id=row.id,
@@ -686,6 +689,54 @@ def _unlisted_reads(db: Session, rows: list[tuple[UnlistedContact, str]]) -> lis
             zone_id=places[row.subzone_id].zone_id,
             zone_name=places[row.subzone_id].zone_name,
             status=row.status,
+            added_by=names.get(row.created_by),
+            added_at=row.created_at,
+            converted_by=names.get(row.updated_by) if row.status == "converted" else None,
+            converted_at=row.updated_at if row.status == "converted" else None,
         )
         for row, category_name in rows
     ]
+
+
+def _who_ids(rows: list[tuple[UnlistedContact, str]]) -> set[int]:
+    """The users who added each contact, and who converted the converted ones."""
+    added = {row.created_by for row, _ in rows if row.created_by is not None}
+    converted = {row.updated_by for row, _ in rows if row.status == "converted" and row.updated_by is not None}
+    return added | converted
+
+
+UNLISTED_CALL_LIMIT = 50
+UNLISTED_HISTORY_FROM = date(2000, 1, 1)
+
+
+def unlisted_detail(db: Session, principal: Principal, unlisted_id: int) -> UnlistedDetailRead:
+    """One unlisted contact in full. The calls follow the caller's visit scope, like every other call list."""
+    rbac_service.require_scope(principal, Perm.CONTACTS_READ)
+    unlisted = repository.get_unlisted(db, unlisted_id)
+    visible = territories_service.visible_territory_ids(db, principal, Perm.CONTACTS_READ)
+    if unlisted is None or (visible is not None and unlisted.subzone_id not in visible):
+        raise NotFound(UNLISTED_NOT_FOUND)
+    calls = sorted(
+        (visit for visit in list_visits(db, principal, UNLISTED_HISTORY_FROM, business_today()) if visit.unlisted_contact_id == unlisted_id),
+        key=lambda visit: (visit.visit_date, visit.visit_time or time.min),
+        reverse=True,
+    )
+    return UnlistedDetailRead(
+        unlisted=_unlisted_read(db, unlisted),
+        calls_total=len(calls),
+        reps=len({visit.user_id for visit in calls}),
+        last_visit=max((visit.visit_date for visit in calls), default=None),
+        calls=[
+            UnlistedCall(
+                visit_id=visit.id,
+                visit_date=visit.visit_date,
+                visit_time=visit.visit_time,
+                day_part=visit.day_part,
+                rep_name=visit.rep_name,
+                status=visit.status,
+                products=[product.name for product in visit.products],
+                remarks=visit.remarks,
+            )
+            for visit in calls[:UNLISTED_CALL_LIMIT]
+        ],
+    )

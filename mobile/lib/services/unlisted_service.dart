@@ -92,6 +92,12 @@ class UnlistedService {
     },
   );
 
+  /// One unlisted contact in full: who added it, its conversion, its totals and its calls.
+  Future<UnlistedDetail> detail(int unlistedId) => _api.getData<UnlistedDetail>(
+    '/visits/unlisted-contacts/$unlistedId',
+    (data) => UnlistedDetail.fromJson(ApiService.asJsonMap(data)),
+  );
+
   /// Flags an unlisted contact as converted. Its past calls stay on it; new calls go to the listed contact.
   Future<void> convert(int unlistedId) => _api.postData<void>(
     '/visits/unlisted-contacts/$unlistedId/convert',

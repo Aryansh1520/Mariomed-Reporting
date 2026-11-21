@@ -30,12 +30,12 @@ class TeamDashboardSections extends StatelessWidget {
       children: [
         _SummaryCard(summary: summary),
         const SizedBox(height: AppSpace.l),
+        _UnlistedLink(onTap: () => Get.toNamed(AppRoutes.unlistedPatches)),
+        const SizedBox(height: AppSpace.l),
         _Panel(
           title: 'Calls per day',
           child: _CallsPerDay(days: data.daily),
         ),
-        const SizedBox(height: AppSpace.l),
-        _UnlistedLink(onTap: () => Get.toNamed(AppRoutes.unlistedPatches)),
         const SizedBox(height: AppSpace.l),
         _SectionCard(
           icon: Iconsax.user,
@@ -136,7 +136,7 @@ class TeamDashboardSections extends StatelessWidget {
   }
 }
 
-/// Opens the unlisted doctors and chemists of each patch: how many are open, converted, and the calls on them.
+/// A prominent entry to the unlisted doctors and chemists of each patch, under the summary so it is not missed.
 class _UnlistedLink extends StatelessWidget {
   const _UnlistedLink({required this.onTap});
 
@@ -147,20 +147,57 @@ class _UnlistedLink extends StatelessWidget {
     final p = context.palette;
     final text = Theme.of(context).textTheme;
 
-    return _Panel(
-      title: 'Unlisted in patches',
+    return Material(
+      color: p.warning.withValues(alpha: 0.14),
+      borderRadius: AppRadius.lg,
       child: InkWell(
+        borderRadius: AppRadius.lg,
         onTap: onTap,
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                'Doctors and chemists met off the list, by patch',
-                style: text.bodyMedium?.copyWith(color: p.inkMuted),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpace.l),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: p.warning,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Iconsax.user_add, size: 22, color: p.onAccent),
               ),
-            ),
-            Icon(Iconsax.arrow_right_3, size: 16, color: p.inkMuted),
-          ],
+              const SizedBox(width: AppSpace.m),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Unlisted in patches',
+                      style: text.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: p.ink,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpace.xs),
+                    Text(
+                      'Doctors and chemists met off the list, by patch',
+                      style: text.bodySmall?.copyWith(color: p.inkMuted),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpace.s),
+              FilledButton(
+                onPressed: onTap,
+                style: FilledButton.styleFrom(
+                  backgroundColor: p.warning,
+                  foregroundColor: p.onAccent,
+                ),
+                child: const Text('View'),
+              ),
+            ],
+          ),
         ),
       ),
     );

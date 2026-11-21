@@ -17,6 +17,8 @@ import '../../models/contact.dart';
 import '../../models/unlisted.dart';
 import '../../services/app_exception.dart';
 import '../../services/auth_service.dart';
+import '../admin/call_detail_sheet.dart';
+import '../visits/unlisted_detail_sheet.dart';
 
 class TerritoryContactsView extends GetView<TerritoryContactsController> {
   const TerritoryContactsView({super.key});
@@ -223,7 +225,7 @@ class TerritoryContactsView extends GetView<TerritoryContactsController> {
             _UnlistedEntry(onTap: () => _addUnlisted()),
             const SizedBox(height: AppSpace.l),
           ],
-          if (canAddUnlisted && unlisted.isNotEmpty) ...[
+          if (unlisted.isNotEmpty) ...[
             Padding(
               padding: const EdgeInsets.only(bottom: AppSpace.s),
               child: Text(
@@ -234,8 +236,10 @@ class TerritoryContactsView extends GetView<TerritoryContactsController> {
                 ),
               ),
             ),
-            _ContactPanel(
-              contacts: [for (final item in unlisted) item.toContact()],
+            _UnlistedPanel(
+              items: unlisted,
+              canRecord: canAddUnlisted,
+              onRecord: (item) => _recordUnlisted(item.toContact()),
             ),
             const SizedBox(height: AppSpace.l),
           ],
@@ -434,4 +438,114 @@ class _TypeChoice {
   const _TypeChoice(this.typeId);
 
   final int? typeId;
+}
+
+/// The unlisted doctors and chemists of the patch. A rep taps one to record a call; anyone can open its details.
+class _UnlistedPanel extends StatelessWidget {
+  const _UnlistedPanel({
+    required this.items,
+    required this.canRecord,
+    required this.onRecord,
+  });
+
+  final List<UnlistedContact> items;
+  final bool canRecord;
+  final void Function(UnlistedContact item) onRecord;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return Container(
+      decoration: BoxDecoration(
+        color: p.surface,
+        borderRadius: AppRadius.lg,
+        boxShadow: AppEffects.card(p),
+        border: AppEffects.hairline(p),
+      ),
+      child: ClipRRect(
+        borderRadius: AppRadius.lg,
+        child: Column(
+          children: [
+            for (var i = 0; i < items.length; i++) ...[
+              if (i > 0) Divider(height: 1, color: p.border),
+              _UnlistedRow(
+                item: items[i],
+                canRecord: canRecord,
+                onRecord: () => onRecord(items[i]),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _UnlistedRow extends StatelessWidget {
+  const _UnlistedRow({
+    required this.item,
+    required this.canRecord,
+    required this.onRecord,
+  });
+
+  final UnlistedContact item;
+  final bool canRecord;
+  final VoidCallback onRecord;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final text = Theme.of(context).textTheme;
+    return InkWell(
+      onTap: canRecord ? onRecord : () => showUnlistedDetail(context, item.id),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpace.l,
+          vertical: AppSpace.m,
+        ),
+        child: Row(
+          children: [
+            CategoryIcon(categoryName: item.categoryName),
+            const SizedBox(width: AppSpace.m),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          item.name,
+                          overflow: TextOverflow.ellipsis,
+                          style: text.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: p.ink,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpace.s),
+                      const UnlistedTag(),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpace.xs),
+                  Text(
+                    item.categoryName,
+                    style: text.bodySmall?.copyWith(
+                      color: p.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              tooltip: 'Details',
+              onPressed: () => showUnlistedDetail(context, item.id),
+              icon: const Icon(Iconsax.info_circle),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

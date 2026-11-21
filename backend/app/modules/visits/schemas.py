@@ -159,6 +159,31 @@ class UnlistedRead(BaseModel):
     zone_id: int
     zone_name: str
     status: str
+    added_by: str | None
+    added_at: datetime
+    converted_by: str | None
+    converted_at: datetime | None
+
+
+class UnlistedCall(BaseModel):
+    visit_id: int
+    visit_date: date
+    visit_time: time | None
+    day_part: DayPart
+    rep_name: str
+    status: str
+    products: list[str]
+    remarks: str
+
+
+class UnlistedDetailRead(BaseModel):
+    """One unlisted contact in full: who added it and when, its conversion, and the calls made on it."""
+
+    unlisted: UnlistedRead
+    calls_total: int
+    reps: int
+    last_visit: date | None
+    calls: list[UnlistedCall]
 
 
 class UnlistedListQuery(BaseModel):
