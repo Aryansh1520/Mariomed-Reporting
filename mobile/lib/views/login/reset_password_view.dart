@@ -7,6 +7,7 @@ import '../../controllers/reset_password_controller.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_effects.dart';
 import '../../core/theme/app_layout.dart';
+import '../../core/widgets/password_field.dart';
 import '../../core/theme/app_tokens.dart';
 
 /// Enter the code from the reset email and a new password. Reached from the sign-in screen.
@@ -75,25 +76,19 @@ class ResetPasswordView extends GetView<ResetPasswordController> {
                     ),
                   ),
                   const SizedBox(height: AppSpace.m),
-                  TextField(
+                  PasswordField(
                     controller: controller.password,
-                    obscureText: true,
+                    labelText: 'New password',
+                    helperText: 'At least 8 characters',
+                    prefixIcon: Iconsax.lock,
                     textInputAction: TextInputAction.next,
-                    decoration: const InputDecoration(
-                      labelText: 'New password',
-                      helperText: 'At least 8 characters',
-                      prefixIcon: Icon(Iconsax.lock),
-                    ),
                   ),
                   const SizedBox(height: AppSpace.m),
-                  TextField(
+                  PasswordField(
                     controller: controller.confirmPassword,
-                    obscureText: true,
+                    labelText: 'Confirm new password',
+                    prefixIcon: Iconsax.lock_1,
                     onSubmitted: (_) => controller.submit(),
-                    decoration: const InputDecoration(
-                      labelText: 'Confirm new password',
-                      prefixIcon: Icon(Iconsax.lock_1),
-                    ),
                   ),
                   Obx(() {
                     final message = controller.errorMessage.value;

@@ -8,6 +8,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_effects.dart';
 import '../../core/theme/app_layout.dart';
 import '../../core/theme/app_tokens.dart';
+import '../../core/widgets/password_field.dart';
 import '../../core/widgets/mesh_hero.dart';
 
 /// Phones show the brand at the top with the sign-in card centred on the screen. Wide windows put the brand
@@ -29,10 +30,10 @@ class LoginView extends GetView<LoginController> {
     );
   }
 
-  /// The hero sits at the top and the card is centred on the whole screen, so the card's centre is the screen's centre.
+  /// The blue hero fills the top half, and the card is centred over it with the logo inside the card.
+  /// Nothing can cover the logo, because it is part of the card.
   Widget _stackedLayout(BuildContext context, ScreenSize size) {
     final gutter = AppLayout.gutterOf(context);
-    // Home's hero is about half the screen and fades into the page at its bottom edge; the login hero matches that.
     final heroHeight = MediaQuery.sizeOf(context).height * 0.5;
     return Stack(
       fit: StackFit.expand,
@@ -42,16 +43,16 @@ class LoginView extends GetView<LoginController> {
           right: 0,
           top: 0,
           height: heroHeight,
-          child: const _Brand(),
+          child: const MeshHero(child: SizedBox.expand()),
         ),
         Center(
-          child: Padding(
+          child: SingleChildScrollView(
             padding: EdgeInsets.all(gutter),
             child: ConstrainedBox(
               constraints: const BoxConstraints(
                 maxWidth: AppLayout.formMaxWidth,
               ),
-              child: _SignInCard(controller: controller),
+              child: _SignInCard(controller: controller, showLogo: true),
             ),
           ),
         ),
@@ -120,9 +121,12 @@ class _Brand extends StatelessWidget {
 
 /// The sign-in card: a heading, one line of instruction, then the fields and the action.
 class _SignInCard extends StatelessWidget {
-  const _SignInCard({required this.controller});
+  const _SignInCard({required this.controller, this.showLogo = false});
 
   final LoginController controller;
+
+  /// Phones put the logo at the top of the card. Wide windows already show it in the brand panel.
+  final bool showLogo;
 
   @override
   Widget build(BuildContext context) {
@@ -141,6 +145,16 @@ class _SignInCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (showLogo) ...[
+            Center(
+              child: Image.asset(
+                'assets/images/mariomed-logo.png',
+                height: 72,
+                semanticLabel: AppConstants.appName,
+              ),
+            ),
+            const SizedBox(height: AppSpace.l),
+          ],
           Text(
             'Sign in',
             style: text.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
@@ -161,27 +175,11 @@ class _SignInCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSpace.m),
-          Obx(
-            () => TextField(
-              controller: controller.password,
-              obscureText: controller.isPasswordHidden.value,
-              onSubmitted: (_) => controller.signIn(),
-              decoration: InputDecoration(
-                labelText: 'Password',
-                prefixIcon: const Icon(Iconsax.lock),
-                suffixIcon: IconButton(
-                  tooltip: controller.isPasswordHidden.value
-                      ? 'Show password'
-                      : 'Hide password',
-                  onPressed: controller.togglePasswordVisibility,
-                  icon: Icon(
-                    controller.isPasswordHidden.value
-                        ? Iconsax.eye
-                        : Iconsax.eye_slash,
-                  ),
-                ),
-              ),
-            ),
+          PasswordField(
+            controller: controller.password,
+            labelText: 'Password',
+            prefixIcon: Iconsax.lock,
+            onSubmitted: (_) => controller.signIn(),
           ),
           Obx(() {
             final message = controller.errorMessage.value;

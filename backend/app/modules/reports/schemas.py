@@ -147,6 +147,7 @@ class TeamCallLine(BaseModel):
     zone_name: str
     products: list[str]
     status: str
+    is_unlisted: bool
 
 
 class MissedContactLine(BaseModel):
@@ -154,6 +155,7 @@ class MissedContactLine(BaseModel):
     category_name: str
     type_name: str | None
     zone_name: str
+    is_unlisted: bool
 
 
 class TeamDashboard(BaseModel):

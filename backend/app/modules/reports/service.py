@@ -146,25 +146,43 @@ def team_missed(
     category_name: str | None = None,
 ) -> list[MissedContactLine]:
     """Active contacts in scope that the team had not visited from the 1st of the month up to and including the day.
+    Unlisted doctors and chemists in active patches are included the same way, and flagged.
     A product narrows it to contacts not given that product: the contacts that missed out on it."""
     rbac_service.require_scope(principal, Perm.ADMIN_DASHBOARD)
     month_visits = visits_service.team_visits(db, principal.user_id, day.replace(day=1), day)
     visited = visits_service.listed_contact_ids(month_visits)
-    contacts = contacts_service.active_contacts_in_subzones(db, territories_service.active_subzone_ids(db))
-    places = territories_service.subzone_locations(db, {contact.subzone_id for contact in contacts})
-    lines = [
+    unlisted_visited = {visit.unlisted_contact_id for visit in month_visits if visit.unlisted_contact_id is not None}
+    active = territories_service.active_subzone_ids(db)
+    contacts = contacts_service.active_contacts_in_subzones(db, active)
+    unlisted = [item for item in visits_service.team_unlisted(db) if item.status == "unlisted" and item.subzone_id in active]
+    places = territories_service.subzone_locations(db, {contact.subzone_id for contact in contacts} | {item.subzone_id for item in unlisted})
+    listed_lines = [
         MissedContactLine(
             contact_name=contact.name,
             category_name=contact.category_name,
             type_name=contact.type_name,
             zone_name=places[contact.subzone_id].zone_name,
+            is_unlisted=False,
         )
         for contact in contacts
         if contact.id not in visited
         and (zone_id is None or places[contact.subzone_id].zone_id == zone_id)
         and (category_name is None or contact.category_name == category_name)
     ]
-    return sorted(lines, key=lambda line: (line.zone_name, line.contact_name))
+    unlisted_lines = [
+        MissedContactLine(
+            contact_name=item.name,
+            category_name=item.category_name,
+            type_name=None,
+            zone_name=places[item.subzone_id].zone_name,
+            is_unlisted=True,
+        )
+        for item in unlisted
+        if item.id not in unlisted_visited
+        and (zone_id is None or places[item.subzone_id].zone_id == zone_id)
+        and (category_name is None or item.category_name == category_name)
+    ]
+    return sorted([*listed_lines, *unlisted_lines], key=lambda line: (line.zone_name, line.contact_name))
 
 
 def team_calls(
@@ -205,6 +223,7 @@ def team_calls(
                 zone_name=visit.zone_name,
                 products=[product.name for product in visit.products],
                 status=visit.status,
+                is_unlisted=visit.unlisted_contact_id is not None,
             )
         )
     return lines

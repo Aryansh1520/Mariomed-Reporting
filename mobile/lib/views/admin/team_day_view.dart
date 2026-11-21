@@ -224,13 +224,14 @@ class _DayBodyState extends State<_DayBody> {
     final p = context.palette;
     final text = Theme.of(context).textTheme;
     final figures = widget.figures;
+    // Only the calls the rep has reported. Open calls are still on the rep's day.
+    final reported = figures.calls
+        .where((call) => call.status != 'open')
+        .toList();
     final point = figures.dashboard.daily.isEmpty
         ? null
         : figures.dashboard.daily.first;
-    final contacts = figures.calls
-        .map((call) => call.contactName)
-        .toSet()
-        .length;
+    final contacts = reported.map((call) => call.contactName).toSet().length;
     final missed = figures.missed.length;
     return Padding(
       padding: EdgeInsets.fromLTRB(
@@ -286,8 +287,8 @@ class _DayBodyState extends State<_DayBody> {
           _section(
             _DaySection.calls,
             title: 'Calls',
-            count: '${figures.calls.length}',
-            body: figures.calls.isEmpty
+            count: '${reported.length}',
+            body: reported.isEmpty
                 ? Text(
                     'No calls on this day.',
                     style: text.bodyMedium?.copyWith(color: p.inkMuted),
@@ -295,7 +296,7 @@ class _DayBodyState extends State<_DayBody> {
                 : ListView(
                     padding: EdgeInsets.zero,
                     children: [
-                      for (final call in figures.calls)
+                      for (final call in reported)
                         Padding(
                           padding: const EdgeInsets.only(bottom: AppSpace.m),
                           child: _DayCallRow(call: call),
@@ -429,9 +430,12 @@ class _MissedRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     final text = Theme.of(context).textTheme;
+    // Unlisted contacts get the warning colour, as on the call rows.
+    final unlisted = contact.isUnlisted;
     return Container(
       padding: const EdgeInsets.all(AppSpace.m),
       decoration: BoxDecoration(
+        color: unlisted ? p.warning.withValues(alpha: 0.08) : null,
         borderRadius: AppRadius.md,
         border: Border.all(color: p.border),
       ),
@@ -442,13 +446,15 @@ class _MissedRow extends StatelessWidget {
             height: 40,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: _Accent.red.tint,
+              color: unlisted
+                  ? p.warning.withValues(alpha: 0.18)
+                  : _Accent.red.tint,
               shape: BoxShape.circle,
             ),
             child: Icon(
               Iconsax.call_remove,
               size: 18,
-              color: _Accent.red.color,
+              color: unlisted ? p.warning : _Accent.red.color,
             ),
           ),
           const SizedBox(width: AppSpace.m),
@@ -557,9 +563,16 @@ class _DayCallRow extends StatelessWidget {
     final chemist = call.categoryName.toLowerCase().contains('chemist');
     final accent = chemist ? _Accent.purple : _Accent.blue;
     final status = _statusStyle(call.status);
+    // Unlisted calls get the warning colour, so they stand apart from listed ones.
+    final unlisted = call.isUnlisted;
+    final avatarTint = unlisted
+        ? p.warning.withValues(alpha: 0.18)
+        : accent.tint;
+    final avatarColor = unlisted ? p.warning : accent.color;
     return Container(
       padding: const EdgeInsets.all(AppSpace.m),
       decoration: BoxDecoration(
+        color: unlisted ? p.warning.withValues(alpha: 0.08) : null,
         borderRadius: AppRadius.md,
         border: Border.all(color: p.border),
       ),
@@ -571,10 +584,10 @@ class _DayCallRow extends StatelessWidget {
             height: 48,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: accent.tint,
+              color: avatarTint,
               shape: BoxShape.circle,
             ),
-            child: Icon(Iconsax.health, size: 22, color: accent.color),
+            child: Icon(Iconsax.health, size: 22, color: avatarColor),
           ),
           const SizedBox(width: AppSpace.m),
           Expanded(

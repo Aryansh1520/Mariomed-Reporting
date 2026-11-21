@@ -8,6 +8,7 @@ import '../../controllers/admin_controller.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_effects.dart';
 import '../../core/theme/app_tokens.dart';
+import '../../core/widgets/password_field.dart';
 import '../../core/widgets/app_dialogs.dart';
 import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/loading_list.dart';
@@ -474,12 +475,9 @@ class _AddPersonSheetState extends State<_AddPersonSheet> {
                 decoration: const InputDecoration(labelText: 'Mobile'),
               ),
               const SizedBox(height: AppSpace.m),
-              TextField(
+              PasswordField(
                 controller: _password,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'Starting password',
-                ),
+                labelText: 'Starting password',
               ),
               const SizedBox(height: AppSpace.l),
               Text(

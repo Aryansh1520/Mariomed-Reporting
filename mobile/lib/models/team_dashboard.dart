@@ -225,6 +225,7 @@ class TeamCallLine {
     required this.zoneName,
     required this.products,
     required this.status,
+    this.isUnlisted = false,
   });
 
   factory TeamCallLine.fromJson(Map<String, Object?> json) => TeamCallLine(
@@ -240,6 +241,7 @@ class TeamCallLine {
       for (final name in json['products'] as List<Object?>) name as String,
     ],
     status: json['status'] as String,
+    isUnlisted: json['is_unlisted'] as bool? ?? false,
   );
 
   final DateTime visitDate;
@@ -252,6 +254,9 @@ class TeamCallLine {
   final String zoneName;
   final List<String> products;
   final String status;
+
+  /// True for a call on an unlisted doctor or chemist, which is not on the contact list.
+  final bool isUnlisted;
 }
 
 /// A contact in scope that the team had not visited yet this month, as the day summary lists it.
@@ -261,6 +266,7 @@ class MissedContact {
     required this.categoryName,
     this.typeName,
     required this.zoneName,
+    this.isUnlisted = false,
   });
 
   factory MissedContact.fromJson(Map<String, Object?> json) => MissedContact(
@@ -268,10 +274,14 @@ class MissedContact {
     categoryName: json['category_name'] as String,
     typeName: json['type_name'] as String?,
     zoneName: json['zone_name'] as String,
+    isUnlisted: json['is_unlisted'] as bool? ?? false,
   );
 
   final String contactName;
   final String categoryName;
   final String? typeName;
   final String zoneName;
+
+  /// True for an unlisted doctor or chemist, which is not on the contact list.
+  final bool isUnlisted;
 }

@@ -18,7 +18,6 @@ class LoginController extends GetxController {
   final password = TextEditingController();
   final isLoading = false.obs;
   final errorMessage = RxnString();
-  final isPasswordHidden = true.obs;
   final rememberMe = true.obs;
 
   /// True when fingerprint or face sign-in is on, the device supports it, and a saved session exists.
@@ -29,8 +28,6 @@ class LoginController extends GetxController {
     super.onInit();
     _restoreChoices();
   }
-
-  void togglePasswordVisibility() => isPasswordHidden.toggle();
 
   Future<void> _restoreChoices() async {
     final saved = await _memory.read();
