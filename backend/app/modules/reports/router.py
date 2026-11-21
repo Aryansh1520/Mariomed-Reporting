@@ -13,11 +13,21 @@ from app.modules.reports.schemas import (
     MissedContactLine,
     TeamCallLine,
     TeamDashboard,
+    TeamDayRoster,
     UnlistedContactLine,
     UnlistedPatchLine,
 )
 
 router = APIRouter()
+
+
+@router.get("/team/day", response_model=TeamDayRoster)
+def team_day_roster(
+    day: date,
+    principal: Principal = Depends(get_principal),
+    db: Session = Depends(get_db),
+) -> TeamDayRoster:
+    return service.team_day_roster(db, principal, day)
 
 
 @router.get("/unlisted/patches", response_model=list[UnlistedPatchLine])

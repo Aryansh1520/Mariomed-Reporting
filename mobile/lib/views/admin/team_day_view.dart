@@ -15,6 +15,7 @@ import '../../services/api_service.dart';
 import '../../services/app_exception.dart';
 import '../../services/team_dashboard_service.dart';
 import '../../models/contact.dart';
+import 'call_detail_sheet.dart';
 
 /// Everything the team did on one day, with previous and next day arrows. Never goes past today.
 class TeamDayView extends StatefulWidget {
@@ -32,22 +33,64 @@ class TeamDayView extends StatefulWidget {
 
 class _TeamDayViewState extends State<TeamDayView> {
   late DateTime _day = widget.day;
-  late Future<_DayFigures> _figures = _load();
+  _DayFigures? _figures;
+  Object? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _reload();
+  }
 
   Future<_DayFigures> _load() async {
     final service = TeamDashboardService(Get.find<ApiService>());
+    final roster = await service.fetchRoster(_day);
+    if (roster.isHoliday) {
+      return _DayFigures(
+        roster: roster,
+        dashboard: null,
+        calls: const [],
+        missed: const [],
+      );
+    }
     final dashboard = await service.fetch(from: _day, to: _day);
     final calls = await service.fetchCalls(from: _day, to: _day);
     final missed = await service.fetchMissed(_day);
-    return _DayFigures(dashboard: dashboard, calls: calls, missed: missed);
+    return _DayFigures(
+      roster: roster,
+      dashboard: dashboard,
+      calls: calls,
+      missed: missed,
+    );
   }
 
-  void _move(int by) {
-    setState(() {
-      _day = _day.add(Duration(days: by));
-      _figures = _load();
-    });
+  /// Loads the day on screen. Pull-to-refresh calls it too, and the figures stay until the new ones arrive.
+  Future<void> _reload() async {
+    final day = _day;
+    try {
+      final figures = await _load();
+      if (!mounted || day != _day) return;
+      setState(() {
+        _figures = figures;
+        _error = null;
+      });
+    } catch (error) {
+      if (!mounted || day != _day) return;
+      setState(() => _error = error);
+    }
   }
+
+  /// Shows another day from scratch, with the loading state, since its figures are not on screen yet.
+  void _showDay(DateTime day) {
+    setState(() {
+      _day = day;
+      _figures = null;
+      _error = null;
+    });
+    _reload();
+  }
+
+  void _move(int by) => _showDay(_day.add(Duration(days: by)));
 
   /// Opens a date picker from the first day of the chart up to today, and shows the day picked.
   Future<void> _pickDay(BuildContext context) async {
@@ -58,10 +101,27 @@ class _TeamDayViewState extends State<TeamDayView> {
       lastDate: indiaToday(),
     );
     if (picked == null) return;
-    setState(() {
-      _day = DateUtils.dateOnly(picked);
-      _figures = _load();
-    });
+    _showDay(DateUtils.dateOnly(picked));
+  }
+
+  Widget _body(BuildContext context) {
+    final figures = _figures;
+    if (figures == null) {
+      final error = _error;
+      if (error == null) return const LoadingList(count: 3);
+      return EmptyState(
+        icon: Iconsax.warning_2,
+        title: 'Could not load this day',
+        message: error is AppException
+            ? error.message
+            : 'Try again in a moment.',
+      );
+    }
+    return _DayBody(
+      figures: figures,
+      gutter: AppLayout.gutterOf(context),
+      onRefresh: _reload,
+    );
   }
 
   @override
@@ -122,6 +182,12 @@ class _TeamDayViewState extends State<TeamDayView> {
                                   color: p.ink,
                                 ),
                               ),
+                              Text(
+                                '  ·  ${weekdayName(_day)}',
+                                style: text.titleMedium?.copyWith(
+                                  color: p.inkMuted,
+                                ),
+                              ),
                               const SizedBox(width: AppSpace.xs),
                               Icon(
                                 Iconsax.calendar_1,
@@ -141,30 +207,7 @@ class _TeamDayViewState extends State<TeamDayView> {
                   ],
                 ),
               ),
-              Expanded(
-                child: FutureBuilder<_DayFigures>(
-                  future: _figures,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState != ConnectionState.done) {
-                      return const LoadingList(count: 3);
-                    }
-                    if (snapshot.hasError) {
-                      final error = snapshot.error;
-                      return EmptyState(
-                        icon: Iconsax.warning_2,
-                        title: 'Could not load this day',
-                        message: error is AppException
-                            ? error.message
-                            : 'Try again in a moment.',
-                      );
-                    }
-                    return _DayBody(
-                      figures: snapshot.data!,
-                      gutter: AppLayout.gutterOf(context),
-                    );
-                  },
-                ),
-              ),
+              Expanded(child: _body(context)),
             ],
           ),
         ),
@@ -175,12 +218,16 @@ class _TeamDayViewState extends State<TeamDayView> {
 
 class _DayFigures {
   const _DayFigures({
+    required this.roster,
     required this.dashboard,
     required this.calls,
     required this.missed,
   });
 
-  final TeamDashboard dashboard;
+  final TeamDayRoster roster;
+
+  /// Null on a holiday, where nothing is shown.
+  final TeamDashboard? dashboard;
   final List<TeamCallLine> calls;
   final List<MissedContact> missed;
 }
@@ -198,154 +245,314 @@ class _Accent {
   static const purple = _Accent(Color(0xFF7B5CE0), Color(0xFFEEE9FD));
 }
 
-/// The day's figures in one card, then every call made that day, in the same style as the person page.
-/// The sections of the day page. Only one is expanded at a time.
-enum _DaySection { calls, missed }
+/// The sections of the day page. Every section starts closed, and only one is open at a time.
+enum _DaySection { reported, notReported, calls, missed }
 
 class _DayBody extends StatefulWidget {
-  const _DayBody({required this.figures, required this.gutter});
+  const _DayBody({
+    required this.figures,
+    required this.gutter,
+    required this.onRefresh,
+  });
 
   final _DayFigures figures;
   final double gutter;
+  final Future<void> Function() onRefresh;
 
   @override
   State<_DayBody> createState() => _DayBodyState();
 }
 
 class _DayBodyState extends State<_DayBody> {
-  /// Calls start expanded. Opening one section closes the other; tapping the open one closes it.
-  _DaySection? _open = _DaySection.calls;
+  _DaySection? _open;
 
   void _toggle(_DaySection section) =>
       setState(() => _open = _open == section ? null : section);
 
   @override
   Widget build(BuildContext context) {
-    final p = context.palette;
-    final text = Theme.of(context).textTheme;
-    final figures = widget.figures;
-    // Only the calls the rep has reported. Open calls are still on the rep's day.
-    final reported = figures.calls
-        .where((call) => call.status != 'open')
-        .toList();
-    final point = figures.dashboard.daily.isEmpty
-        ? null
-        : figures.dashboard.daily.first;
-    final contacts = reported.map((call) => call.contactName).toSet().length;
-    final missed = figures.missed.length;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        widget.gutter,
-        0,
-        widget.gutter,
-        widget.gutter,
-      ),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(AppSpace.l),
-            decoration: BoxDecoration(
-              color: p.surface,
-              borderRadius: AppRadius.lg,
-              boxShadow: AppEffects.card(p),
-            ),
-            child: IntrinsicHeight(
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _StatTile(
-                      icon: Iconsax.call,
-                      accent: _Accent.blue,
-                      value: '${point?.calls ?? 0}',
-                      label: 'Calls made',
-                    ),
-                  ),
-                  _VerticalRule(color: p.border),
-                  Expanded(
-                    child: _StatTile(
-                      icon: Iconsax.people,
-                      accent: _Accent.purple,
-                      value: '$contacts',
-                      label: 'Contacts visited',
-                    ),
-                  ),
-                  _VerticalRule(color: p.border),
-                  Expanded(
-                    child: _StatTile(
-                      icon: Iconsax.warning_2,
-                      accent: _Accent.red,
-                      value: '$missed',
-                      label: 'Missed so far this month',
-                      alert: missed > 0,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: AppSpace.l),
-          _section(
-            _DaySection.calls,
-            title: 'Calls',
-            count: '${reported.length}',
-            body: reported.isEmpty
-                ? Text(
-                    'No calls on this day.',
-                    style: text.bodyMedium?.copyWith(color: p.inkMuted),
-                  )
-                : ListView(
-                    padding: EdgeInsets.zero,
-                    children: [
-                      for (final call in reported)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: AppSpace.m),
-                          child: _DayCallRow(call: call),
-                        ),
-                    ],
-                  ),
-          ),
-          const SizedBox(height: AppSpace.m),
-          _section(
-            _DaySection.missed,
-            title: 'Missed calls until this day',
-            count: '$missed',
-            body: missed == 0
-                ? Text(
-                    'Every contact in scope was visited.',
-                    style: text.bodyMedium?.copyWith(color: p.inkMuted),
-                  )
-                : ListView(
-                    padding: EdgeInsets.zero,
-                    children: [
-                      for (final contact in figures.missed)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: AppSpace.m),
-                          child: _MissedRow(contact: contact),
-                        ),
-                    ],
-                  ),
-          ),
-        ],
+    final roster = widget.figures.roster;
+    return RefreshIndicator(
+      onRefresh: widget.onRefresh,
+      child: ListView(
+        padding: EdgeInsets.fromLTRB(
+          widget.gutter,
+          0,
+          widget.gutter,
+          widget.gutter,
+        ),
+        children: roster.isHoliday
+            ? [_HolidayCard(name: roster.holidayName ?? 'Holiday')]
+            : _dayContent(context),
       ),
     );
   }
 
-  /// An expanded section takes the remaining height and scrolls inside itself; a collapsed one is only its header.
+  List<Widget> _dayContent(BuildContext context) {
+    final p = context.palette;
+    final text = Theme.of(context).textTheme;
+    final figures = widget.figures;
+    final roster = figures.roster;
+    final daily = figures.dashboard?.daily ?? const [];
+    final point = daily.isEmpty ? null : daily.first;
+    // Only the calls the rep has reported. Open calls are still on the rep's day.
+    final reported = figures.calls
+        .where((call) => call.status != 'open')
+        .toList();
+    final contacts = reported.map((call) => call.contactName).toSet().length;
+    final missed = figures.missed.length;
+    return [
+      Container(
+        padding: const EdgeInsets.all(AppSpace.l),
+        decoration: BoxDecoration(
+          color: p.surface,
+          borderRadius: AppRadius.lg,
+          boxShadow: AppEffects.card(p),
+        ),
+        child: IntrinsicHeight(
+          child: Row(
+            children: [
+              Expanded(
+                child: _StatTile(
+                  icon: Iconsax.call,
+                  accent: _Accent.blue,
+                  value: '${point?.calls ?? 0}',
+                  label: 'Calls made',
+                ),
+              ),
+              _VerticalRule(color: p.border),
+              Expanded(
+                child: _StatTile(
+                  icon: Iconsax.people,
+                  accent: _Accent.purple,
+                  value: '$contacts',
+                  label: 'Contacts visited',
+                ),
+              ),
+              _VerticalRule(color: p.border),
+              Expanded(
+                child: _StatTile(
+                  icon: Iconsax.warning_2,
+                  accent: _Accent.red,
+                  value: '$missed',
+                  label: 'Missed so far this month',
+                  alert: missed > 0,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      _section(
+        _DaySection.reported,
+        title: 'Reported',
+        count: '${roster.reported.length}',
+        body: _employees(
+          context,
+          roster.reported,
+          emptyText: 'Nobody has reported this day yet.',
+        ),
+      ),
+      _section(
+        _DaySection.notReported,
+        title: 'Not reported',
+        count: '${roster.notReported.length}',
+        body: _employees(
+          context,
+          roster.notReported,
+          emptyText: 'Everyone has reported this day.',
+        ),
+      ),
+      _section(
+        _DaySection.calls,
+        title: 'Calls',
+        count: '${reported.length}',
+        body: reported.isEmpty
+            ? Text(
+                'No reported calls on this day.',
+                style: text.bodyMedium?.copyWith(color: p.inkMuted),
+              )
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (final call in reported)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpace.m),
+                      child: _DayCallRow(call: call),
+                    ),
+                ],
+              ),
+      ),
+      _section(
+        _DaySection.missed,
+        title: 'Missed calls until this day',
+        count: '$missed',
+        body: missed == 0
+            ? Text(
+                'Every contact in scope was visited.',
+                style: text.bodyMedium?.copyWith(color: p.inkMuted),
+              )
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (final contact in figures.missed)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpace.m),
+                      child: _MissedRow(contact: contact),
+                    ),
+                ],
+              ),
+      ),
+    ];
+  }
+
+  Widget _employees(
+    BuildContext context,
+    List<DayEmployee> people, {
+    required String emptyText,
+  }) {
+    if (people.isEmpty) {
+      return Text(
+        emptyText,
+        style: Theme.of(context).textTheme.bodyMedium
+            ?.copyWith(color: context.palette.inkMuted),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final person in people)
+          Padding(
+            padding: const EdgeInsets.only(bottom: AppSpace.m),
+            child: _EmployeeRow(person: person),
+          ),
+      ],
+    );
+  }
+
   Widget _section(
     _DaySection section, {
     required String title,
     required String count,
     required Widget body,
   }) {
-    final expanded = _open == section;
-    final card = _CollapsibleCard(
-      title: title,
-      count: count,
-      expanded: expanded,
-      onTap: () => _toggle(section),
-      body: body,
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpace.l),
+      child: _CollapsibleCard(
+        title: title,
+        count: count,
+        expanded: _open == section,
+        onTap: () => _toggle(section),
+        body: body,
+      ),
     );
-    return expanded ? Expanded(child: card) : card;
+  }
+}
+
+/// One employee on the day: reported with their calls, not reported, or on leave.
+class _EmployeeRow extends StatelessWidget {
+  const _EmployeeRow({required this.person});
+
+  final DayEmployee person;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final text = Theme.of(context).textTheme;
+    final reported = person.status == 'reported';
+    final leave = person.status == 'leave';
+    final color = reported
+        ? _Accent.green.color
+        : leave
+        ? p.inkMuted
+        : _Accent.red.color;
+    final tint = reported
+        ? _Accent.green.tint
+        : leave
+        ? p.border
+        : _Accent.red.tint;
+    final calls = '${person.calls} ${person.calls == 1 ? 'call' : 'calls'}';
+    final detail = switch (person.status) {
+      'reported' => calls,
+      'leave' => 'On leave',
+      _ => person.calls == 0 ? 'Not reported' : '$calls, not reported',
+    };
+    return Container(
+      padding: const EdgeInsets.all(AppSpace.m),
+      decoration: BoxDecoration(
+        borderRadius: AppRadius.md,
+        border: Border.all(color: p.border),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(color: tint, shape: BoxShape.circle),
+            child: Icon(Iconsax.user, size: 18, color: color),
+          ),
+          const SizedBox(width: AppSpace.m),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  person.fullName,
+                  style: text.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: p.ink,
+                  ),
+                ),
+                const SizedBox(height: AppSpace.xs),
+                Text(
+                  detail,
+                  style: text.bodySmall?.copyWith(color: p.inkMuted),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Shown instead of the day's figures on a Sunday or a holiday.
+class _HolidayCard extends StatelessWidget {
+  const _HolidayCard({required this.name});
+
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final text = Theme.of(context).textTheme;
+    return Container(
+      padding: const EdgeInsets.all(AppSpace.l),
+      decoration: BoxDecoration(
+        color: p.surface,
+        borderRadius: AppRadius.lg,
+        boxShadow: AppEffects.card(p),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Holiday',
+            style: text.titleMedium?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: p.ink,
+            ),
+          ),
+          const SizedBox(height: AppSpace.xs),
+          Text(
+            '$name. There are no calls or reports to show for this day.',
+            style: text.bodyMedium?.copyWith(color: p.inkMuted),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -377,7 +584,7 @@ class _CollapsibleCard extends StatelessWidget {
         boxShadow: AppEffects.card(p),
       ),
       child: Column(
-        mainAxisSize: expanded ? MainAxisSize.max : MainAxisSize.min,
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           InkWell(
@@ -410,10 +617,7 @@ class _CollapsibleCard extends StatelessWidget {
               ],
             ),
           ),
-          if (expanded) ...[
-            const SizedBox(height: AppSpace.l),
-            Expanded(child: body),
-          ],
+          if (expanded) ...[const SizedBox(height: AppSpace.l), body],
         ],
       ),
     );
@@ -435,7 +639,7 @@ class _MissedRow extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(AppSpace.m),
       decoration: BoxDecoration(
-        color: unlisted ? p.warning.withValues(alpha: 0.08) : null,
+        color: unlisted ? p.warning.withValues(alpha: 0.16) : null,
         borderRadius: AppRadius.md,
         border: Border.all(color: p.border),
       ),
@@ -462,12 +666,22 @@ class _MissedRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  contact.contactName,
-                  style: text.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: p.ink,
-                  ),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        contact.contactName,
+                        style: text.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: p.ink,
+                        ),
+                      ),
+                    ),
+                    if (contact.isUnlisted) ...[
+                      const SizedBox(width: AppSpace.s),
+                      const UnlistedTag(),
+                    ],
+                  ],
                 ),
                 const SizedBox(height: AppSpace.xs),
                 Text(
@@ -569,89 +783,103 @@ class _DayCallRow extends StatelessWidget {
         ? p.warning.withValues(alpha: 0.18)
         : accent.tint;
     final avatarColor = unlisted ? p.warning : accent.color;
-    return Container(
-      padding: const EdgeInsets.all(AppSpace.m),
-      decoration: BoxDecoration(
-        color: unlisted ? p.warning.withValues(alpha: 0.08) : null,
-        borderRadius: AppRadius.md,
-        border: Border.all(color: p.border),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: avatarTint,
-              shape: BoxShape.circle,
+    return InkWell(
+      borderRadius: AppRadius.md,
+      onTap: () => showCallDetail(context, CallDetail.fromTeamLine(call)),
+      child: Container(
+        padding: const EdgeInsets.all(AppSpace.m),
+        decoration: BoxDecoration(
+          color: unlisted ? p.warning.withValues(alpha: 0.16) : null,
+          borderRadius: AppRadius.md,
+          border: Border.all(color: p.border),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: avatarTint,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Iconsax.health, size: 22, color: avatarColor),
             ),
-            child: Icon(Iconsax.health, size: 22, color: avatarColor),
-          ),
-          const SizedBox(width: AppSpace.m),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${call.contactName}  ·  ${contactKind(call.categoryName, call.typeName)}',
-                  style: text.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: p.ink,
-                  ),
-                ),
-                const SizedBox(height: AppSpace.xs),
-                Text(
-                  '${callTimeLabel(call.dayPart, call.visitTime)}  ·  ${call.repName}  ·  ${call.zoneName}',
-                  style: text.bodySmall?.copyWith(color: p.inkMuted),
-                ),
-                if (call.products.isNotEmpty) ...[
-                  const SizedBox(height: AppSpace.s),
-                  Wrap(
-                    spacing: AppSpace.xs,
-                    runSpacing: AppSpace.xs,
+            const SizedBox(width: AppSpace.m),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
-                      for (final product in call.products)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpace.s,
-                            vertical: AppSpace.xs,
-                          ),
-                          decoration: BoxDecoration(
-                            color: p.border.withValues(alpha: 0.5),
-                            borderRadius: AppRadius.sm,
-                          ),
-                          child: Text(
-                            product,
-                            style: text.labelSmall?.copyWith(color: p.ink),
+                      Flexible(
+                        child: Text(
+                          '${call.contactName}  ·  ${contactKind(call.categoryName, call.typeName)}',
+                          style: text.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color: p.ink,
                           ),
                         ),
+                      ),
+                      if (call.isUnlisted) ...[
+                        const SizedBox(width: AppSpace.s),
+                        const UnlistedTag(),
+                      ],
                     ],
                   ),
+                  const SizedBox(height: AppSpace.xs),
+                  Text(
+                    '${callTimeLabel(call.dayPart, call.visitTime)}  ·  ${call.repName}  ·  ${call.zoneName}',
+                    style: text.bodySmall?.copyWith(color: p.inkMuted),
+                  ),
+                  if (call.products.isNotEmpty) ...[
+                    const SizedBox(height: AppSpace.s),
+                    Wrap(
+                      spacing: AppSpace.xs,
+                      runSpacing: AppSpace.xs,
+                      children: [
+                        for (final product in call.products)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpace.s,
+                              vertical: AppSpace.xs,
+                            ),
+                            decoration: BoxDecoration(
+                              color: p.border.withValues(alpha: 0.5),
+                              borderRadius: AppRadius.sm,
+                            ),
+                            child: Text(
+                              product,
+                              style: text.labelSmall?.copyWith(color: p.ink),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
                 ],
-              ],
-            ),
-          ),
-          const SizedBox(width: AppSpace.s),
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpace.s,
-              vertical: AppSpace.xs,
-            ),
-            decoration: BoxDecoration(
-              color: status.$2,
-              borderRadius: AppRadius.pill,
-            ),
-            child: Text(
-              status.$1,
-              style: text.labelMedium?.copyWith(
-                color: status.$3,
-                fontWeight: FontWeight.w700,
               ),
             ),
-          ),
-        ],
+            const SizedBox(width: AppSpace.s),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpace.s,
+                vertical: AppSpace.xs,
+              ),
+              decoration: BoxDecoration(
+                color: status.$2,
+                borderRadius: AppRadius.pill,
+              ),
+              child: Text(
+                status.$1,
+                style: text.labelMedium?.copyWith(
+                  color: status.$3,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -8,14 +8,16 @@ from sqlalchemy.orm import Session
 from app.core.exceptions import BadRequest, NotFound
 from app.core.pagination import PageQuery
 from app.modules.contacts import service as contacts_service
-from app.modules.holidays.service import holiday_dates
+from app.modules.holidays.service import holiday_dates, holiday_name_on
 from app.modules.planning import service as planning_service
 from app.modules.rbac import service as rbac_service
 from app.modules.rbac.catalog import Perm, PermissionScope
 from app.modules.rbac.principal import Principal
 from app.modules.reports.schemas import (
     CallLine,
+    DayEmployeeLine,
     MissedContactLine,
+    TeamDayRoster,
     CategoryLine,
     DayLine,
     DayPoint,
@@ -84,6 +86,7 @@ def member_detail(db: Session, principal: Principal, user_id: int, start: date, 
             products=[product.name for product in visit.products],
             remarks=visit.remarks,
             status=visit.status,
+            is_unlisted=visit.unlisted_contact_id is not None,
         )
         for visit in sorted(visits, key=_call_order)
     ]
@@ -185,6 +188,30 @@ def team_missed(
     return sorted([*listed_lines, *unlisted_lines], key=lambda line: (line.zone_name, line.contact_name))
 
 
+def team_day_roster(db: Session, principal: Principal, day: date) -> TeamDayRoster:
+    """Each reporting employee on the day, split into those who reported it and those who did not.
+    Sundays and holidays have no roster."""
+    rbac_service.require_scope(principal, Perm.ADMIN_DASHBOARD)
+    holiday = "Sunday" if day.weekday() == SUNDAY else holiday_name_on(db, day)
+    if holiday is not None:
+        return TeamDayRoster(day=day, is_holiday=True, holiday_name=holiday, reported=[], not_reported=[])
+    records = {record.user_id: record for record in visits_service.team_days(db, day, day)}
+    calls = Counter(visit.user_id for visit in visits_service.team_visits(db, principal.user_id, day, day))
+    reported: list[DayEmployeeLine] = []
+    not_reported: list[DayEmployeeLine] = []
+    for reporter in sorted(_reporting_members(db), key=lambda reporter: reporter.full_name):
+        record = records.get(reporter.user_id)
+        status = record.status if record is not None else "open"
+        line = DayEmployeeLine(
+            user_id=reporter.user_id,
+            full_name=reporter.full_name,
+            calls=calls[reporter.user_id],
+            status="reported" if status == "ended" else ("leave" if status == "leave" else "not_reported"),
+        )
+        (reported if line.status == "reported" else not_reported).append(line)
+    return TeamDayRoster(day=day, is_holiday=False, holiday_name=None, reported=reported, not_reported=not_reported)
+
+
 def team_calls(
     db: Session,
     principal: Principal,
@@ -224,6 +251,7 @@ def team_calls(
                 products=[product.name for product in visit.products],
                 status=visit.status,
                 is_unlisted=visit.unlisted_contact_id is not None,
+                remarks=visit.remarks,
             )
         )
     return lines

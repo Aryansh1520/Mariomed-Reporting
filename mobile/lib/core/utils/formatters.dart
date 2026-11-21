@@ -48,6 +48,17 @@ const _monthNames = [
 String formatDay(DateTime day) =>
     '${day.day} ${_monthNames[day.month - 1]} ${day.year}';
 
+/// The name of the day of the week, such as "Saturday".
+String weekdayName(DateTime day) => const [
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+  'Sunday',
+][day.weekday - 1];
+
 /// A date as the API takes it in a query or a path: yyyy-mm-dd.
 String apiDate(DateTime value) =>
     '${value.year.toString().padLeft(4, '0')}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';

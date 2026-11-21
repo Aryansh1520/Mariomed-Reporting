@@ -67,4 +67,11 @@ class TeamDashboardService {
       ];
     });
   }
+
+  /// Who reported the day and who did not. Sundays and holidays come back without a roster.
+  Future<TeamDayRoster> fetchRoster(DateTime day) =>
+      _api.getData<TeamDayRoster>(
+        '/reports/team/day?day=${_date(day)}',
+        (data) => TeamDayRoster.fromJson(ApiService.asJsonMap(data)),
+      );
 }

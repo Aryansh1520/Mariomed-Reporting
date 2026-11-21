@@ -1,4 +1,5 @@
 from datetime import date, time
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -39,6 +40,7 @@ class CallLine(BaseModel):
     products: list[str]
     remarks: str
     status: str
+    is_unlisted: bool
 
 
 class MemberDetail(BaseModel):
@@ -148,6 +150,26 @@ class TeamCallLine(BaseModel):
     products: list[str]
     status: str
     is_unlisted: bool
+    remarks: str
+
+
+class DayEmployeeLine(BaseModel):
+    """One employee's standing on a day: whether they reported it, and how many calls they made."""
+
+    user_id: int
+    full_name: str
+    calls: int
+    status: Literal["reported", "not_reported", "leave"]
+
+
+class TeamDayRoster(BaseModel):
+    """Who reported the day and who did not. A holiday or Sunday has no roster."""
+
+    day: date
+    is_holiday: bool
+    holiday_name: str | None
+    reported: list[DayEmployeeLine]
+    not_reported: list[DayEmployeeLine]
 
 
 class MissedContactLine(BaseModel):

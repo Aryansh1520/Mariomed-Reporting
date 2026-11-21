@@ -225,6 +225,7 @@ class TeamCallLine {
     required this.zoneName,
     required this.products,
     required this.status,
+    required this.remarks,
     this.isUnlisted = false,
   });
 
@@ -242,6 +243,7 @@ class TeamCallLine {
     ],
     status: json['status'] as String,
     isUnlisted: json['is_unlisted'] as bool? ?? false,
+    remarks: json['remarks'] as String,
   );
 
   final DateTime visitDate;
@@ -257,6 +259,60 @@ class TeamCallLine {
 
   /// True for a call on an unlisted doctor or chemist, which is not on the contact list.
   final bool isUnlisted;
+
+  final String remarks;
+}
+
+/// One employee's standing on a day: whether they reported it, and their calls.
+class DayEmployee {
+  const DayEmployee({
+    required this.userId,
+    required this.fullName,
+    required this.calls,
+    required this.status,
+  });
+
+  factory DayEmployee.fromJson(Map<String, Object?> json) => DayEmployee(
+    userId: json['user_id'] as int,
+    fullName: json['full_name'] as String,
+    calls: json['calls'] as int,
+    status: json['status'] as String,
+  );
+
+  final int userId;
+  final String fullName;
+  final int calls;
+
+  /// reported, not_reported or leave.
+  final String status;
+}
+
+/// Who reported a day and who did not. Sundays and holidays have no roster.
+class TeamDayRoster {
+  const TeamDayRoster({
+    required this.isHoliday,
+    this.holidayName,
+    required this.reported,
+    required this.notReported,
+  });
+
+  factory TeamDayRoster.fromJson(Map<String, Object?> json) => TeamDayRoster(
+    isHoliday: json['is_holiday'] as bool,
+    holidayName: json['holiday_name'] as String?,
+    reported: [
+      for (final item in json['reported'] as List<Object?>)
+        DayEmployee.fromJson((item as Map).cast()),
+    ],
+    notReported: [
+      for (final item in json['not_reported'] as List<Object?>)
+        DayEmployee.fromJson((item as Map).cast()),
+    ],
+  );
+
+  final bool isHoliday;
+  final String? holidayName;
+  final List<DayEmployee> reported;
+  final List<DayEmployee> notReported;
 }
 
 /// A contact in scope that the team had not visited yet this month, as the day summary lists it.

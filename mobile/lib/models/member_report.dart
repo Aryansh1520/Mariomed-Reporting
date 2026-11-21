@@ -76,6 +76,7 @@ class CallLine {
     required this.products,
     required this.remarks,
     required this.status,
+    this.isUnlisted = false,
   });
 
   factory CallLine.fromJson(Map<String, Object?> json) => CallLine(
@@ -92,6 +93,7 @@ class CallLine {
     ],
     remarks: json['remarks'] as String,
     status: json['status'] as String,
+    isUnlisted: json['is_unlisted'] as bool? ?? false,
   );
 
   final int visitId;
@@ -104,6 +106,9 @@ class CallLine {
   final List<String> products;
   final String remarks;
   final String status;
+
+  /// True for a call on an unlisted doctor or chemist, which is not on the contact list.
+  final bool isUnlisted;
 }
 
 class MemberDetail {

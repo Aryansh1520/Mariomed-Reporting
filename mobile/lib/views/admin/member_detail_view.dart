@@ -18,6 +18,7 @@ import '../../services/auth_service.dart';
 import '../../services/member_report_service.dart';
 import '../../services/visit_service.dart';
 import '../../models/contact.dart';
+import 'call_detail_sheet.dart';
 
 /// What the member detail page opens on: the person and the period.
 class MemberDetailArgs {
@@ -1293,18 +1294,18 @@ class _CallDetailSheet extends StatelessWidget {
                 style: text.bodyMedium?.copyWith(color: p.inkMuted),
               ),
               const SizedBox(height: AppSpace.l),
-              _DetailLine(label: 'Date', value: formatDay(call.visitDate)),
-              _DetailLine(
+              DetailLine(label: 'Date', value: formatDay(call.visitDate)),
+              DetailLine(
                 label: 'Time',
                 value: callTimeLabel(call.dayPart, call.visitTime),
               ),
-              _DetailLine(
+              DetailLine(
                 label: 'Products',
                 value: call.products.isEmpty
                     ? 'None recorded'
                     : call.products.join(', '),
               ),
-              _DetailLine(
+              DetailLine(
                 label: 'Remarks',
                 value: remarks.isEmpty ? 'No remarks' : remarks,
               ),
@@ -1393,30 +1394,6 @@ class _SettleButton extends StatelessWidget {
                   : null,
               child: Text(label),
             ),
-    );
-  }
-}
-
-class _DetailLine extends StatelessWidget {
-  const _DetailLine({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = context.palette;
-    final text = Theme.of(context).textTheme;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpace.m),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: text.bodySmall?.copyWith(color: p.inkMuted)),
-          const SizedBox(height: AppSpace.xs),
-          Text(value, style: text.bodyMedium?.copyWith(color: p.ink)),
-        ],
-      ),
     );
   }
 }
