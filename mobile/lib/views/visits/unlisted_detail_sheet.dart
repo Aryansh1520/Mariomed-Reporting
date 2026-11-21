@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:iconsax/iconsax.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/widgets/app_dialogs.dart';
 import '../../models/unlisted.dart';
 import '../../services/api_service.dart';
 import '../../services/app_exception.dart';
+import '../../services/auth_service.dart';
 import '../../services/unlisted_service.dart';
 import '../admin/call_detail_sheet.dart';
 
@@ -30,9 +33,39 @@ class _UnlistedDetailSheet extends StatefulWidget {
 }
 
 class _UnlistedDetailSheetState extends State<_UnlistedDetailSheet> {
-  late final Future<UnlistedDetail> _detail = UnlistedService(
-    Get.find<ApiService>(),
-  ).detail(widget.unlistedId);
+  late Future<UnlistedDetail> _detail = _load();
+
+  UnlistedService get _service => UnlistedService(Get.find<ApiService>());
+
+  Future<UnlistedDetail> _load() => _service.detail(widget.unlistedId);
+
+  /// Reloads the contact after a change, so its status and buttons are current.
+  void _reload() => setState(() => _detail = _load());
+
+  Future<void> _remove(UnlistedContact contact) async {
+    final confirmed = await AppDialogs.confirm(
+      title: 'Remove ${contact.name}?',
+      message: 'They leave the patch list and reps can no longer record calls on them. Their calls stay in the history. You can restore them later.',
+      confirmLabel: 'Remove',
+      destructive: true,
+    );
+    if (!confirmed) return;
+    try {
+      await _service.remove(widget.unlistedId);
+      _reload();
+    } on AppException catch (e) {
+      if (mounted) await AppDialogs.error('Could not remove', e.message);
+    }
+  }
+
+  Future<void> _restore() async {
+    try {
+      await _service.restore(widget.unlistedId);
+      _reload();
+    } on AppException catch (e) {
+      if (mounted) await AppDialogs.error('Could not restore', e.message);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -57,16 +90,31 @@ class _UnlistedDetailSheetState extends State<_UnlistedDetailSheet> {
             ),
           );
         }
-        return _UnlistedDetailBody(detail: snapshot.data!);
+        return _UnlistedDetailBody(
+          detail: snapshot.data!,
+          canManage: Get.find<AuthService>().can('contacts.manage'),
+          onRemove: _remove,
+          onRestore: _restore,
+        );
       },
     );
   }
 }
 
 class _UnlistedDetailBody extends StatelessWidget {
-  const _UnlistedDetailBody({required this.detail});
+  const _UnlistedDetailBody({
+    required this.detail,
+    required this.canManage,
+    required this.onRemove,
+    required this.onRestore,
+  });
 
   final UnlistedDetail detail;
+
+  /// Whether the signed-in user can remove or restore contacts. The backend checks it again.
+  final bool canManage;
+  final void Function(UnlistedContact contact) onRemove;
+  final VoidCallback onRestore;
 
   @override
   Widget build(BuildContext context) {
@@ -110,7 +158,7 @@ class _UnlistedDetailBody extends StatelessWidget {
                   style: text.bodyMedium?.copyWith(color: p.inkMuted),
                 ),
               ),
-              _StatusPill(converted: converted),
+              _StatusPill(status: unlisted.status),
             ],
           ),
           const SizedBox(height: AppSpace.l),
@@ -141,6 +189,22 @@ class _UnlistedDetailBody extends StatelessWidget {
             label: 'Last call',
             value: lastVisit == null ? 'No calls yet' : formatDay(lastVisit),
           ),
+          if (canManage && unlisted.status == 'unlisted') ...[
+            const SizedBox(height: AppSpace.s),
+            OutlinedButton.icon(
+              onPressed: () => onRemove(unlisted),
+              icon: const Icon(Iconsax.trash),
+              label: const Text('Remove contact'),
+            ),
+          ],
+          if (canManage && unlisted.status == 'removed') ...[
+            const SizedBox(height: AppSpace.s),
+            FilledButton.icon(
+              onPressed: onRestore,
+              icon: const Icon(Iconsax.refresh),
+              label: const Text('Restore contact'),
+            ),
+          ],
           const SizedBox(height: AppSpace.s),
           Text(
             'Calls',
@@ -168,15 +232,20 @@ class _UnlistedDetailBody extends StatelessWidget {
 }
 
 class _StatusPill extends StatelessWidget {
-  const _StatusPill({required this.converted});
+  const _StatusPill({required this.status});
 
-  final bool converted;
+  /// unlisted, converted or removed.
+  final String status;
 
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
     final text = Theme.of(context).textTheme;
-    final color = converted ? p.go : p.warning;
+    final (label, color) = switch (status) {
+      'converted' => ('Converted', p.go),
+      'removed' => ('Removed', p.alert),
+      _ => ('Open', p.warning),
+    };
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpace.s,
@@ -187,7 +256,7 @@ class _StatusPill extends StatelessWidget {
         borderRadius: AppRadius.sm,
       ),
       child: Text(
-        converted ? 'Converted' : 'Open',
+        label,
         style: text.labelMedium?.copyWith(
           color: color,
           fontWeight: FontWeight.w700,

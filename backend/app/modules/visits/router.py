@@ -99,6 +99,24 @@ def unlisted_detail(
     return service.unlisted_detail(db, principal, unlisted_id)
 
 
+@router.post("/unlisted-contacts/{unlisted_id}/remove", response_model=UnlistedRead)
+def remove_unlisted(
+    unlisted_id: int,
+    principal: Principal = Depends(get_principal),
+    db: Session = Depends(get_db),
+) -> UnlistedRead:
+    return service.remove_unlisted(db, principal, unlisted_id)
+
+
+@router.post("/unlisted-contacts/{unlisted_id}/restore", response_model=UnlistedRead)
+def restore_unlisted(
+    unlisted_id: int,
+    principal: Principal = Depends(get_principal),
+    db: Session = Depends(get_db),
+) -> UnlistedRead:
+    return service.restore_unlisted(db, principal, unlisted_id)
+
+
 @router.post("/unlisted-contacts/{unlisted_id}/convert", response_model=UnlistedRead)
 def convert_unlisted(
     unlisted_id: int,

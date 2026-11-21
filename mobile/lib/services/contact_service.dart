@@ -73,6 +73,7 @@ class ContactService {
     int? categoryId,
     int? typeId,
     bool changeType = false,
+    bool? isActive,
   }) => _api.patchData<void>(
     '/contacts/$contactId',
     (_) {},
@@ -80,6 +81,7 @@ class ContactService {
       'name': ?name,
       'category_id': ?categoryId,
       if (changeType) 'type_id': typeId,
+      'is_active': ?isActive,
     },
   );
 

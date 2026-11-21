@@ -135,6 +135,18 @@ class TerritoryContactsController extends GetxController {
     }
   }
 
+  /// Switches a listed contact off or on. A switched-off contact stays in the list but cannot be visited.
+  /// Returns the problem to show, or null when it was saved.
+  Future<String?> setContactActive(Contact contact, bool isActive) async {
+    try {
+      await _service.updateContact(contact.id, isActive: isActive);
+      await load();
+      return null;
+    } on AppException catch (e) {
+      return e.message;
+    }
+  }
+
   Future<void> load() async {
     _isLoading.value = true;
     _errorMessage.value = null;

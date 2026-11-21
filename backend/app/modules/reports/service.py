@@ -165,6 +165,7 @@ def team_missed(
             category_name=contact.category_name,
             type_name=contact.type_name,
             zone_name=places[contact.subzone_id].zone_name,
+            subzone_name=places[contact.subzone_id].name,
             is_unlisted=False,
         )
         for contact in contacts
@@ -178,6 +179,7 @@ def team_missed(
             category_name=item.category_name,
             type_name=None,
             zone_name=places[item.subzone_id].zone_name,
+            subzone_name=places[item.subzone_id].name,
             is_unlisted=True,
         )
         for item in unlisted
@@ -248,6 +250,7 @@ def team_calls(
                 category_name=visit.category_name,
                 type_name=visit.type_name,
                 zone_name=visit.zone_name,
+                subzone_name=visit.subzone_name,
                 products=[product.name for product in visit.products],
                 status=visit.status,
                 is_unlisted=visit.unlisted_contact_id is not None,

@@ -63,7 +63,7 @@ class UnlistedContact(AuditFieldsMixin, Base):
     __tablename__ = "unlisted_contacts"
     __table_args__ = (
         CheckConstraint("length(btrim(name)) > 0", name="ck_unlisted_contacts_name_not_blank"),
-        CheckConstraint("status IN ('unlisted', 'converted')", name="ck_unlisted_contacts_status"),
+        CheckConstraint("status IN ('unlisted', 'converted', 'removed')", name="ck_unlisted_contacts_status"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)

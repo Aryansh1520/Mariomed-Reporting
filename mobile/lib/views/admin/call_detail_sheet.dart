@@ -18,7 +18,7 @@ class CallDetail {
     required this.products,
     required this.remarks,
     this.repName,
-    this.zoneName,
+    this.patch,
     this.isUnlisted = false,
   });
 
@@ -31,7 +31,7 @@ class CallDetail {
     products: call.products,
     remarks: call.remarks,
     repName: call.repName,
-    zoneName: call.zoneName,
+    patch: '${call.zoneName}  ›  ${call.subzoneName}',
     isUnlisted: call.isUnlisted,
   );
 
@@ -58,7 +58,9 @@ class CallDetail {
   final List<String> products;
   final String remarks;
   final String? repName;
-  final String? zoneName;
+
+  /// The zone and patch the call was made in, such as "Malad  ›  Andheri East".
+  final String? patch;
   final bool isUnlisted;
 }
 
@@ -201,8 +203,8 @@ class _CallDetailSheet extends StatelessWidget {
           DetailLine(label: 'Time', value: detail.timeLabel),
           if (detail.repName != null)
             DetailLine(label: 'Rep', value: detail.repName!),
-          if (detail.zoneName != null)
-            DetailLine(label: 'Zone', value: detail.zoneName!),
+          if (detail.patch != null)
+            DetailLine(label: 'Patch', value: detail.patch!),
           DetailLine(
             label: 'Products',
             value: detail.products.isEmpty

@@ -57,6 +57,9 @@ UNLISTED_NOT_FOUND = "This unlisted contact does not exist."
 UNLISTED_CONVERTED = "This contact has been converted to a listed contact. Record the call on the listed contact."
 UNLISTED_ALREADY_CONVERTED = "This unlisted contact has already been converted."
 UNLISTED_SUBJECT_FIXED = "A call on an unlisted contact stays on that contact."
+UNLISTED_REMOVED = "This contact has been removed. Ask an admin to restore it."
+UNLISTED_NOT_OPEN = "Only an open unlisted contact can be removed."
+UNLISTED_NOT_REMOVED = "Only a removed unlisted contact can be restored."
 PATCH_NOT_FOUND = "Choose an active patch for this contact."
 PATCH_REQUIRED = "Choose the patch for this call."
 PATCH_NOT_YOURS = "This patch is not one of your territories."
@@ -352,6 +355,8 @@ def _reachable_unlisted(db: Session, principal: Principal, unlisted_id: int) -> 
         raise NotFound(UNLISTED_NOT_FOUND)
     if unlisted.status == "converted":
         raise BadRequest(UNLISTED_CONVERTED)
+    if unlisted.status == "removed":
+        raise BadRequest(UNLISTED_REMOVED)
     return unlisted
 
 
@@ -663,6 +668,39 @@ def convert_unlisted(db: Session, principal: Principal, unlisted_id: int) -> Unl
     audit.record(db, principal.user_id, "unlisted_contact.convert", "unlisted_contact", unlisted.id)
     db.commit()
     return _unlisted_read(db, unlisted)
+
+
+def remove_unlisted(db: Session, principal: Principal, unlisted_id: int) -> UnlistedRead:
+    """Soft delete: the contact leaves the lists and can no longer be recorded on. Its calls stay in the history."""
+    unlisted = _manageable_unlisted(db, principal, unlisted_id)
+    if unlisted.status != "unlisted":
+        raise Conflict(UNLISTED_NOT_OPEN)
+    unlisted.status = "removed"
+    unlisted.updated_by = principal.user_id
+    audit.record(db, principal.user_id, "unlisted_contact.remove", "unlisted_contact", unlisted.id)
+    db.commit()
+    return _unlisted_read(db, unlisted)
+
+
+def restore_unlisted(db: Session, principal: Principal, unlisted_id: int) -> UnlistedRead:
+    unlisted = _manageable_unlisted(db, principal, unlisted_id)
+    if unlisted.status != "removed":
+        raise Conflict(UNLISTED_NOT_REMOVED)
+    _ensure_patch_open(db, principal, unlisted.subzone_id, Perm.CONTACTS_MANAGE)
+    unlisted.status = "unlisted"
+    unlisted.updated_by = principal.user_id
+    audit.record(db, principal.user_id, "unlisted_contact.restore", "unlisted_contact", unlisted.id)
+    db.commit()
+    return _unlisted_read(db, unlisted)
+
+
+def _manageable_unlisted(db: Session, principal: Principal, unlisted_id: int) -> UnlistedContact:
+    rbac_service.require_scope(principal, Perm.CONTACTS_MANAGE)
+    unlisted = repository.get_unlisted(db, unlisted_id)
+    visible = territories_service.visible_territory_ids(db, principal, Perm.CONTACTS_MANAGE)
+    if unlisted is None or (visible is not None and unlisted.subzone_id not in visible):
+        raise NotFound(UNLISTED_NOT_FOUND)
+    return unlisted
 
 
 def team_unlisted(db: Session) -> list[UnlistedRead]:

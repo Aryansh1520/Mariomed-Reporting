@@ -685,7 +685,7 @@ class _MissedRow extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpace.xs),
                 Text(
-                  '${contactKind(contact.categoryName, contact.typeName)}  ·  ${contact.zoneName}',
+                  '${contactKind(contact.categoryName, contact.typeName)}  ·  ${contact.zoneName}  ›  ${contact.subzoneName}',
                   style: text.bodySmall?.copyWith(color: p.inkMuted),
                 ),
               ],
@@ -830,7 +830,7 @@ class _DayCallRow extends StatelessWidget {
                   ),
                   const SizedBox(height: AppSpace.xs),
                   Text(
-                    '${callTimeLabel(call.dayPart, call.visitTime)}  ·  ${call.repName}  ·  ${call.zoneName}',
+                    '${callTimeLabel(call.dayPart, call.visitTime)}  ·  ${call.repName}  ·  ${call.zoneName}  ›  ${call.subzoneName}',
                     style: text.bodySmall?.copyWith(color: p.inkMuted),
                   ),
                   if (call.products.isNotEmpty) ...[

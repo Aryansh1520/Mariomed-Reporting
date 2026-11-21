@@ -223,6 +223,7 @@ class TeamCallLine {
     required this.categoryName,
     this.typeName,
     required this.zoneName,
+    required this.subzoneName,
     required this.products,
     required this.status,
     required this.remarks,
@@ -238,6 +239,7 @@ class TeamCallLine {
     categoryName: json['category_name'] as String,
     typeName: json['type_name'] as String?,
     zoneName: json['zone_name'] as String,
+    subzoneName: json['subzone_name'] as String,
     products: [
       for (final name in json['products'] as List<Object?>) name as String,
     ],
@@ -254,6 +256,7 @@ class TeamCallLine {
   final String categoryName;
   final String? typeName;
   final String zoneName;
+  final String subzoneName;
   final List<String> products;
   final String status;
 
@@ -322,6 +325,7 @@ class MissedContact {
     required this.categoryName,
     this.typeName,
     required this.zoneName,
+    required this.subzoneName,
     this.isUnlisted = false,
   });
 
@@ -330,6 +334,7 @@ class MissedContact {
     categoryName: json['category_name'] as String,
     typeName: json['type_name'] as String?,
     zoneName: json['zone_name'] as String,
+    subzoneName: json['subzone_name'] as String,
     isUnlisted: json['is_unlisted'] as bool? ?? false,
   );
 
@@ -337,6 +342,7 @@ class MissedContact {
   final String categoryName;
   final String? typeName;
   final String zoneName;
+  final String subzoneName;
 
   /// True for an unlisted doctor or chemist, which is not on the contact list.
   final bool isUnlisted;

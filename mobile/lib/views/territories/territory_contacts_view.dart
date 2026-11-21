@@ -184,6 +184,24 @@ class TerritoryContactsView extends GetView<TerritoryContactsController> {
         ],
       );
 
+  /// Switches a listed contact off, so reps cannot visit it, or back on. Its history is kept either way.
+  Future<void> _toggleContact(Contact contact) async {
+    final switchOff = contact.isActive;
+    final confirmed = await AppDialogs.confirm(
+      title: switchOff
+          ? 'Switch off ${contact.name}?'
+          : 'Switch on ${contact.name}?',
+      message: switchOff
+          ? 'Reps can no longer record calls on this contact. Its history stays.'
+          : 'Reps can record calls on this contact again.',
+      confirmLabel: switchOff ? 'Switch off' : 'Switch on',
+      destructive: switchOff,
+    );
+    if (!confirmed) return;
+    final problem = await controller.setContactActive(contact, !switchOff);
+    if (problem != null) await AppDialogs.error('Could not save', problem);
+  }
+
   Future<void> _recordUnlisted(Contact contact) async {
     await Get.toNamed(
       AppRoutes.visitRecord,
@@ -254,6 +272,9 @@ class TerritoryContactsView extends GetView<TerritoryContactsController> {
               onEdit: auth.can('contacts.manage')
                   ? (contact) => _save(contact: contact)
                   : null,
+              onToggle: auth.can('contacts.manage')
+                  ? (contact) => _toggleContact(contact)
+                  : null,
             ),
         ],
       ),
@@ -323,15 +344,17 @@ class _UnlistedEntry extends StatelessWidget {
 
 /// All contacts in one surface, separated by hairlines. A list this long reads better as one panel than as stacked cards.
 class _ContactPanel extends StatelessWidget {
-  const _ContactPanel({required this.contacts, this.onEdit});
+  const _ContactPanel({required this.contacts, this.onEdit, this.onToggle});
 
   final List<Contact> contacts;
   final void Function(Contact contact)? onEdit;
+  final void Function(Contact contact)? onToggle;
 
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
     final edit = onEdit;
+    final toggle = onToggle;
     return Container(
       decoration: BoxDecoration(
         color: p.surface,
@@ -348,6 +371,7 @@ class _ContactPanel extends StatelessWidget {
               _ContactRow(
                 contact: contacts[i],
                 onEdit: edit == null ? null : () => edit(contacts[i]),
+                onToggle: toggle == null ? null : () => toggle(contacts[i]),
               ),
             ],
           ],
@@ -358,10 +382,11 @@ class _ContactPanel extends StatelessWidget {
 }
 
 class _ContactRow extends StatelessWidget {
-  const _ContactRow({required this.contact, this.onEdit});
+  const _ContactRow({required this.contact, this.onEdit, this.onToggle});
 
   final Contact contact;
   final VoidCallback? onEdit;
+  final VoidCallback? onToggle;
 
   @override
   Widget build(BuildContext context) {
@@ -414,6 +439,14 @@ class _ContactRow extends StatelessWidget {
                 tooltip: 'Edit contact',
                 onPressed: onEdit,
                 icon: const Icon(Iconsax.edit_2),
+              ),
+            if (onToggle != null)
+              IconButton(
+                tooltip: contact.isActive ? 'Switch off' : 'Switch on',
+                onPressed: onToggle,
+                icon: Icon(
+                  contact.isActive ? Iconsax.close_circle : Iconsax.tick_circle,
+                ),
               ),
           ],
         ),

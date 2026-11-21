@@ -98,6 +98,17 @@ class UnlistedService {
     (data) => UnlistedDetail.fromJson(ApiService.asJsonMap(data)),
   );
 
+  /// Soft delete: the contact leaves the lists and can no longer be recorded on. Its calls stay in the history.
+  Future<void> remove(int unlistedId) => _api.postData<void>(
+    '/visits/unlisted-contacts/$unlistedId/remove',
+    (_) {},
+  );
+
+  Future<void> restore(int unlistedId) => _api.postData<void>(
+    '/visits/unlisted-contacts/$unlistedId/restore',
+    (_) {},
+  );
+
   /// Flags an unlisted contact as converted. Its past calls stay on it; new calls go to the listed contact.
   Future<void> convert(int unlistedId) => _api.postData<void>(
     '/visits/unlisted-contacts/$unlistedId/convert',
