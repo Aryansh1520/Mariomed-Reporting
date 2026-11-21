@@ -14,6 +14,8 @@ import '../../core/widgets/category_icon.dart';
 import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/loading_list.dart';
 import '../../models/contact.dart';
+import '../../models/unlisted.dart';
+import '../../services/app_exception.dart';
 import '../../services/auth_service.dart';
 
 class TerritoryContactsView extends GetView<TerritoryContactsController> {
@@ -118,6 +120,76 @@ class TerritoryContactsView extends GetView<TerritoryContactsController> {
     return _TypeChoice(picked == _noType ? null : picked);
   }
 
+  /// Adds a doctor or chemist who is not on the list to this patch, then opens the call on them.
+  /// A name already in the patch is offered for reuse first, so the rep decides whether it is the same person.
+  Future<void> _addUnlisted() async {
+    if (controller.categories.isEmpty) {
+      await AppDialogs.info(
+        'No categories',
+        'Ask an admin to set up contact categories first.',
+      );
+      return;
+    }
+    final entered = await AppDialogs.prompt(
+      title: 'Unlisted doctor or chemist',
+      label: 'Name',
+    );
+    final name = entered?.trim() ?? '';
+    if (name.isEmpty) return;
+    final categoryId = await AppDialogs.choose<int>(
+      title: 'Category',
+      choices: [
+        for (final category in controller.categories)
+          AppChoice<int>(
+            value: category.id,
+            label: category.name,
+            icon: Iconsax.user,
+          ),
+      ],
+    );
+    if (categoryId == null) return;
+    try {
+      final matches = await controller.similarUnlisted(name);
+      final reuse = matches.isEmpty ? false : await _askToReuse(matches.first);
+      if (reuse == null) return;
+      final unlisted = reuse
+          ? matches.first
+          : await controller.addUnlisted(name: name, categoryId: categoryId);
+      await _recordUnlisted(unlisted.toContact());
+    } on AppException catch (e) {
+      await AppDialogs.error('Could not add', e.message);
+    }
+  }
+
+  /// Null when the choice sheet is dismissed. True to reuse the contact already in the patch, false to add a new one.
+  Future<bool?> _askToReuse(UnlistedContact existing) =>
+      AppDialogs.choose<bool>(
+        title: 'Already in this patch',
+        choices: [
+          AppChoice<bool>(
+            value: true,
+            label: 'Use ${existing.name}',
+            icon: Iconsax.user_tick,
+            description: 'Record the call on the contact already added here.',
+          ),
+          const AppChoice<bool>(
+            value: false,
+            label: 'Add a new one',
+            icon: Iconsax.user_add,
+            description:
+                'Keep both, for example when they are different people.',
+          ),
+        ],
+      );
+
+  Future<void> _recordUnlisted(Contact contact) async {
+    await Get.toNamed(
+      AppRoutes.visitRecord,
+      arguments: VisitRecordArgs(contact: contact),
+    );
+    await controller.load();
+  }
+
   Widget _body(BuildContext context, double gutter) {
     if (controller.isLoading) return const LoadingList(count: 4);
     final error = controller.errorMessage;
@@ -128,7 +200,10 @@ class TerritoryContactsView extends GetView<TerritoryContactsController> {
         message: error,
       );
     }
-    if (controller.contacts.isEmpty) {
+    final auth = Get.find<AuthService>();
+    final canAddUnlisted = !controller.isZone && auth.reportsPersonally;
+    final unlisted = controller.unlistedContacts;
+    if (controller.contacts.isEmpty && !canAddUnlisted && unlisted.isEmpty) {
       return EmptyState(
         icon: Iconsax.user,
         title: 'No contacts here yet',
@@ -137,18 +212,106 @@ class TerritoryContactsView extends GetView<TerritoryContactsController> {
             : 'Nobody is recorded in this patch yet.',
       );
     }
+    final p = context.palette;
+    final text = Theme.of(context).textTheme;
     return RefreshIndicator(
       onRefresh: controller.load,
       child: ListView(
         padding: EdgeInsets.all(gutter),
         children: [
-          _ContactPanel(
-            contacts: controller.contacts,
-            onEdit: Get.find<AuthService>().can('contacts.manage')
-                ? (contact) => _save(contact: contact)
-                : null,
-          ),
+          if (canAddUnlisted) ...[
+            _UnlistedEntry(onTap: () => _addUnlisted()),
+            const SizedBox(height: AppSpace.l),
+          ],
+          if (canAddUnlisted && unlisted.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpace.s),
+              child: Text(
+                'Unlisted in this patch',
+                style: text.titleSmall?.copyWith(
+                  color: p.inkMuted,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            _ContactPanel(
+              contacts: [for (final item in unlisted) item.toContact()],
+            ),
+            const SizedBox(height: AppSpace.l),
+          ],
+          if (controller.contacts.isEmpty)
+            Text(
+              'Nobody is recorded in this patch yet.',
+              style: text.bodyMedium?.copyWith(color: p.inkMuted),
+            )
+          else
+            _ContactPanel(
+              contacts: controller.contacts,
+              onEdit: auth.can('contacts.manage')
+                  ? (contact) => _save(contact: contact)
+                  : null,
+            ),
         ],
+      ),
+    );
+  }
+}
+
+/// The first row of a patch: adds a doctor or chemist who is not on the contact list.
+class _UnlistedEntry extends StatelessWidget {
+  const _UnlistedEntry({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final text = Theme.of(context).textTheme;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: p.surface,
+        borderRadius: AppRadius.lg,
+        boxShadow: AppEffects.card(p),
+        border: AppEffects.hairline(p),
+      ),
+      child: ClipRRect(
+        borderRadius: AppRadius.lg,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpace.l,
+              vertical: AppSpace.m,
+            ),
+            child: Row(
+              children: [
+                Icon(Iconsax.user_add, color: p.primary),
+                const SizedBox(width: AppSpace.m),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Unlisted doctor or chemist',
+                        style: text.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: p.ink,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpace.xs),
+                      Text(
+                        'Not on the list? Add them here and record the call.',
+                        style: text.bodySmall?.copyWith(color: p.inkMuted),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Iconsax.arrow_right_3, size: 16, color: p.inkMuted),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

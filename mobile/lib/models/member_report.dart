@@ -68,7 +68,8 @@ class CallLine {
   const CallLine({
     required this.visitId,
     required this.visitDate,
-    required this.visitTime,
+    this.visitTime,
+    required this.dayPart,
     required this.contactName,
     required this.categoryName,
     this.typeName,
@@ -80,7 +81,8 @@ class CallLine {
   factory CallLine.fromJson(Map<String, Object?> json) => CallLine(
     visitId: json['visit_id'] as int,
     visitDate: DateTime.parse(json['visit_date'] as String),
-    visitTime: json['visit_time'] as String,
+    visitTime: json['visit_time'] as String?,
+    dayPart: json['day_part'] as String,
     contactName: json['contact_name'] as String,
     categoryName: json['category_name'] as String,
     typeName: json['type_name'] as String?,
@@ -94,7 +96,8 @@ class CallLine {
 
   final int visitId;
   final DateTime visitDate;
-  final String visitTime;
+  final String? visitTime;
+  final String dayPart;
   final String contactName;
   final String categoryName;
   final String? typeName;

@@ -20,6 +20,12 @@ abstract class AppRoutes {
   /// One person's performance over the period. The person and period are the route argument.
   static const memberDetail = '/admin/performance/member';
 
+  /// Unlisted doctors and chemists per patch, for the admin.
+  static const unlistedPatches = '/admin/unlisted';
+
+  /// The unlisted contacts of one patch for the period chosen on [unlistedPatches]. The arguments are UnlistedPatchArgs.
+  static const unlistedPatch = '/admin/unlisted/patch';
+
   /// Creates or edits a role. The role is the route argument; none means a new role.
   static const roleEditor = '/admin/roles/edit';
 

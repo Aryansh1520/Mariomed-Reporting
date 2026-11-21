@@ -87,21 +87,21 @@ def _month(db: Session, principal: Principal, month_start, today, month_visits) 
     days = visits_service.list_days(db, principal, month_start, today)
     return MonthStats(
         calls=len(month_visits),
-        contacts_visited=len({visit.contact_id for visit in month_visits}),
+        contacts_visited=len(visits_service.listed_contact_ids(month_visits)),
         days_reported=sum(1 for day in days if day.status == "ended"),
     )
 
 
 def _coverage(db: Session, principal: Principal, month_visits) -> CoverageStats:
     total = contacts_service.count_reachable_active(db, principal)
-    visited = min(len({visit.contact_id for visit in month_visits}), total)
+    visited = min(len(visits_service.listed_contact_ids(month_visits)), total)
     return CoverageStats(visited=visited, total=total, percent=visited / total if total else 0.0)
 
 
 def _missed(db: Session, principal: Principal, month_visits) -> MissedStats:
     """The contacts that were not visited this month, out of the ones the caller can visit."""
     total = contacts_service.count_reachable_active(db, principal)
-    visited = min(len({visit.contact_id for visit in month_visits}), total)
+    visited = min(len(visits_service.listed_contact_ids(month_visits)), total)
     return MissedStats(missed_contacts=total - visited)
 
 

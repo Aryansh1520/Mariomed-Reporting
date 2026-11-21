@@ -377,9 +377,9 @@ class _VisitRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 48,
+            width: 84,
             child: Text(
-              visit.visitTime.substring(0, 5),
+              callTimeLabel(visit.dayPart, visit.visitTime),
               style: text.labelLarge?.copyWith(color: p.inkMuted),
             ),
           ),

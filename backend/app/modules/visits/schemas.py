@@ -1,8 +1,13 @@
-from typing import Literal
+from typing import Literal, get_args
 
 from datetime import date, datetime, time
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+DayPart = Literal["morning", "afternoon", "evening"]
+DAY_PART_ORDER: dict[str, int] = {part: rank for rank, part in enumerate(get_args(DayPart))}
+ONE_WHEN_ONLY = "Send either the time or the part of the day for this call, not both."
+ONE_SUBJECT_ONLY = "Record the call on a contact or on an unlisted doctor or chemist, not both."
 
 
 def _clean(value: str) -> str:
@@ -13,12 +18,29 @@ def _clean(value: str) -> str:
 
 
 class VisitCreate(BaseModel):
-    contact_id: int
+    """A call is placed by its part of the day. Older app versions send a clock time instead.
+    It is placed on a listed contact, or on an unlisted doctor or chemist of the patch, never both."""
+
+    contact_id: int | None = None
+    unlisted_contact_id: int | None = None
     visit_date: date
-    visit_time: time
+    visit_time: time | None = None
+    day_part: DayPart | None = None
     remarks: str = Field(min_length=1, max_length=2000)
     product_ids: list[int] = Field(min_length=1, max_length=50)
     partner_user_id: int | None = None
+
+    @model_validator(mode="after")
+    def _check_when(self) -> "VisitCreate":
+        if (self.visit_time is None) == (self.day_part is None):
+            raise ValueError("Choose the part of the day for this call." if self.day_part is None else ONE_WHEN_ONLY)
+        return self
+
+    @model_validator(mode="after")
+    def _check_subject(self) -> "VisitCreate":
+        if (self.contact_id is None) == (self.unlisted_contact_id is None):
+            raise ValueError(ONE_SUBJECT_ONLY)
+        return self
 
     @field_validator("remarks")
     @classmethod
@@ -31,9 +53,16 @@ class VisitUpdate(BaseModel):
 
     contact_id: int | None = None
     visit_time: time | None = None
+    day_part: DayPart | None = None
     remarks: str | None = Field(default=None, min_length=1, max_length=2000)
     product_ids: list[int] | None = Field(default=None, min_length=1, max_length=50)
     partner_user_id: int | None = None
+
+    @model_validator(mode="after")
+    def _check_when(self) -> "VisitUpdate":
+        if self.visit_time is not None and self.day_part is not None:
+            raise ValueError(ONE_WHEN_ONLY)
+        return self
 
     @field_validator("remarks")
     @classmethod
@@ -51,10 +80,12 @@ class VisitRead(BaseModel):
     user_id: int
     rep_name: str
     visit_date: date
-    visit_time: time
+    visit_time: time | None
+    day_part: DayPart
     status: str
     remarks: str
-    contact_id: int
+    contact_id: int | None
+    unlisted_contact_id: int | None
     contact_name: str
     category_name: str
     type_name: str | None
@@ -87,7 +118,8 @@ class JointRequestRead(BaseModel):
     visit_id: int
     initiator_user_id: int
     visit_date: date
-    visit_time: time
+    visit_time: time | None
+    day_part: DayPart
     contact_name: str
     category_name: str
     type_name: str | None
@@ -97,6 +129,59 @@ class JointRequestRead(BaseModel):
     products: list[ProductRef]
     status: str
     can_respond: bool
+
+
+def _clean_name(value: str) -> str:
+    stripped = value.strip()
+    if not stripped:
+        raise ValueError("Enter the name of the doctor or chemist.")
+    return stripped
+
+
+class UnlistedCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    category_id: int
+    subzone_id: int
+
+    @field_validator("name")
+    @classmethod
+    def _check_name(cls, value: str) -> str:
+        return _clean_name(value)
+
+
+class UnlistedRead(BaseModel):
+    id: int
+    name: str
+    category_id: int
+    category_name: str
+    subzone_id: int
+    subzone_name: str
+    zone_id: int
+    zone_name: str
+    status: str
+
+
+class UnlistedListQuery(BaseModel):
+    subzone_id: int
+    include_converted: bool = False
+    page: int = Field(default=1, ge=1)
+    page_size: int = Field(default=100, ge=1, le=100)
+
+    @property
+    def offset(self) -> int:
+        return (self.page - 1) * self.page_size
+
+
+class UnlistedSimilarQuery(BaseModel):
+    """Unlisted contacts in the patch with the same name, so a rep can pick one instead of adding a duplicate."""
+
+    subzone_id: int
+    name: str = Field(min_length=1, max_length=120)
+
+    @field_validator("name")
+    @classmethod
+    def _check_name(cls, value: str) -> str:
+        return _clean_name(value)
 
 
 class DisputeDecision(BaseModel):

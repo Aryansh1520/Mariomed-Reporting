@@ -145,21 +145,68 @@ class _WhenRow extends StatelessWidget {
           ),
         ),
         const SizedBox(width: AppSpace.m),
-        Expanded(
-          child: _FieldTile(
-            label: 'Time',
-            value: controller.visitTime.value.format(context),
-            icon: Iconsax.clock,
-            onTap: () async {
-              final picked = await showTimePicker(
-                context: context,
-                initialTime: controller.visitTime.value,
-              );
-              if (picked != null) controller.setTime(picked);
-            },
-          ),
-        ),
+        Expanded(child: _DayPartField(controller: controller)),
       ],
+    );
+  }
+}
+
+/// The part of the day a call was made in. Nothing is pre-selected, so the rep must choose one.
+class _DayPartField extends StatelessWidget {
+  const _DayPartField({required this.controller});
+
+  final VisitRecordController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final text = Theme.of(context).textTheme;
+
+    return Obx(
+      () => Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpace.m,
+          vertical: AppSpace.s,
+        ),
+        decoration: BoxDecoration(
+          color: p.surface,
+          borderRadius: AppRadius.md,
+          border: Border.all(color: p.border),
+        ),
+        child: Row(
+          children: [
+            Icon(Iconsax.clock, size: 18, color: p.primary),
+            const SizedBox(width: AppSpace.s),
+            Expanded(
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  isExpanded: true,
+                  value: controller.dayPart.value,
+                  hint: Text(
+                    'Part of the day',
+                    style: text.bodyLarge?.copyWith(color: p.inkMuted),
+                  ),
+                  items: [
+                    for (final part in dayPartOptions)
+                      DropdownMenuItem(
+                        value: part,
+                        child: Text(
+                          dayPartLabel(part),
+                          style: text.bodyLarge?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) controller.setDayPart(value);
+                  },
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -34,8 +34,6 @@ class ReportService {
 
   static DateTime get _todayDate => indiaToday();
 
-  static String _time(String visitTime) => visitTime.substring(0, 5);
-
   Future<ReportData> _todayReport() async {
     final today = _todayDate;
     final visits = await _visits.listVisits(from: today, to: today);
@@ -99,7 +97,8 @@ class ReportService {
         ReportFigure(label: 'Calls', value: '${visits.length}'),
         ReportFigure(
           label: 'Contacts visited',
-          value: '${visits.map((visit) => visit.contactId).toSet().length}',
+          value:
+              '${visits.map((visit) => visit.contactId).whereType<int>().toSet().length}',
         ),
         ReportFigure(
           label: 'Days reported',
@@ -137,7 +136,7 @@ class ReportService {
     final visited = (await _visits.listVisits(
       from: start,
       to: _todayDate,
-    )).map((visit) => visit.contactId).toSet();
+    )).map((visit) => visit.contactId).whereType<int>().toSet();
     final covered = [
       for (final contact in contacts)
         if (visited.contains(contact.id)) contact,
@@ -190,7 +189,7 @@ class ReportService {
     final visited = (await _visits.listVisits(
       from: start,
       to: _todayDate,
-    )).map((visit) => visit.contactId).toSet();
+    )).map((visit) => visit.contactId).whereType<int>().toSet();
     final missed = [
       for (final contact in contacts)
         if (!visited.contains(contact.id)) contact,
@@ -384,7 +383,7 @@ class ReportService {
   static ReportRow _visitRow(VisitRecord visit) => ReportRow(
     title: visit.contactName,
     subtitle:
-        '${_time(visit.visitTime)}  ·  ${visit.repName}  ·  ${visit.products.map((product) => product.name).join(', ')}',
+        '${callTimeLabel(visit.dayPart, visit.visitTime)}  ·  ${visit.repName}  ·  ${visit.products.map((product) => product.name).join(', ')}',
     trailing: contactKind(visit.categoryName, visit.typeName),
   );
 

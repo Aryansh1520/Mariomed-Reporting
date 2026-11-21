@@ -9,4 +9,4 @@ from app.modules.products.models import Product  # noqa: F401
 from app.modules.rbac.models import Permission, Role, RolePermission  # noqa: F401
 from app.modules.territories.models import MapRegion, Territory, UserTerritory  # noqa: F401
 from app.modules.users.models import User  # noqa: F401
-from app.modules.visits.models import Visit, VisitDay, VisitParticipation  # noqa: F401
+from app.modules.visits.models import UnlistedContact, Visit, VisitDay, VisitParticipation  # noqa: F401

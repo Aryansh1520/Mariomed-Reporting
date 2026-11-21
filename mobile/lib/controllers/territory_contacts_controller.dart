@@ -2,22 +2,33 @@ import 'package:get/get.dart';
 
 import '../models/contact.dart';
 import '../models/territory.dart';
+import '../models/unlisted.dart';
 import '../services/app_exception.dart';
 import '../services/contact_service.dart';
+import '../services/unlisted_service.dart';
 
 /// Every contact inside one zone or subzone, read page by page until the whole list is in.
 class TerritoryContactsController extends GetxController {
-  TerritoryContactsController(this._service, this.territory);
+  TerritoryContactsController(
+    this._service,
+    this._unlistedService,
+    this.territory,
+  );
 
   final ContactService _service;
+  final UnlistedService _unlistedService;
   final Territory territory;
   final _contacts = <Contact>[].obs;
+  final _unlistedContacts = <UnlistedContact>[].obs;
   final _categories = <ContactCategory>[].obs;
   final _types = <ContactType>[].obs;
   final _isLoading = true.obs;
   final _errorMessage = RxnString();
 
   List<Contact> get contacts => _contacts;
+
+  /// Doctors and chemists met in this patch that are not on the contact list. Empty for a headquarter.
+  List<UnlistedContact> get unlistedContacts => _unlistedContacts;
 
   /// The categories a contact can be given. Switched-off categories are left out.
   List<ContactCategory> get categories => _categories;
@@ -86,6 +97,44 @@ class TerritoryContactsController extends GetxController {
     }
   }
 
+  /// Adds an unlisted doctor or chemist to this patch. Throws the app's error when it cannot be saved.
+  Future<UnlistedContact> addUnlisted({
+    required String name,
+    required int categoryId,
+  }) async {
+    final added = await _unlistedService.add(
+      name: name,
+      categoryId: categoryId,
+      subzoneId: territory.id,
+    );
+    await _loadUnlistedContacts();
+    return added;
+  }
+
+  /// Unlisted contacts in this patch under the same name, so the rep can reuse one instead of adding a duplicate.
+  Future<List<UnlistedContact>> similarUnlisted(String name) =>
+      _unlistedService.findSimilar(subzoneId: territory.id, name: name);
+
+  Future<void> _loadUnlistedContacts() async {
+    if (isZone) return;
+    try {
+      final collected = <UnlistedContact>[];
+      var page = 1;
+      while (true) {
+        final result = await _unlistedService.listUnlisted(
+          subzoneId: territory.id,
+          page: page,
+        );
+        collected.addAll(result.items);
+        if (result.items.isEmpty || collected.length >= result.total) break;
+        page++;
+      }
+      _unlistedContacts.assignAll(collected);
+    } on AppException catch (e) {
+      _errorMessage.value = e.message;
+    }
+  }
+
   Future<void> load() async {
     _isLoading.value = true;
     _errorMessage.value = null;
@@ -103,6 +152,7 @@ class TerritoryContactsController extends GetxController {
         page++;
       }
       _contacts.assignAll(collected);
+      await _loadUnlistedContacts();
     } on AppException catch (e) {
       _errorMessage.value = e.message;
     } finally {

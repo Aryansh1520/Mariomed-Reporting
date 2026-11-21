@@ -1,6 +1,7 @@
 from collections import Counter, defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, time, timedelta
 
 from sqlalchemy.orm import Session
 
@@ -25,12 +26,15 @@ from app.modules.reports.schemas import (
     TeamCallLine,
     TeamDashboard,
     TeamSummary,
+    UnlistedCategoryLine,
+    UnlistedContactLine,
+    UnlistedPatchLine,
     ZoneLine,
 )
 from app.modules.territories import service as territories_service
 from app.modules.users import service as users_service
 from app.modules.visits import service as visits_service
-from app.modules.visits.schemas import VisitRead
+from app.modules.visits.schemas import DAY_PART_ORDER, UnlistedRead, VisitRead
 
 MAX_RANGE_DAYS = 366
 SUNDAY = 6
@@ -73,6 +77,7 @@ def member_detail(db: Session, principal: Principal, user_id: int, start: date, 
             visit_id=visit.id,
             visit_date=visit.visit_date,
             visit_time=visit.visit_time,
+            day_part=visit.day_part,
             contact_name=visit.contact_name,
             category_name=visit.category_name,
             type_name=visit.type_name,
@@ -80,7 +85,7 @@ def member_detail(db: Session, principal: Principal, user_id: int, start: date, 
             remarks=visit.remarks,
             status=visit.status,
         )
-        for visit in sorted(visits, key=lambda visit: (visit.visit_date, visit.visit_time))
+        for visit in sorted(visits, key=_call_order)
     ]
     return MemberDetail(member=row, days=day_lines, calls=call_lines)
 
@@ -89,6 +94,11 @@ def member_detail(db: Session, principal: Principal, user_id: int, start: date, 
 class _Reporter:
     user_id: int
     full_name: str
+
+
+def _call_order(visit: VisitRead) -> tuple[date, int, time]:
+    """By day, then part of the day, then clock time for calls an older app logged with one."""
+    return visit.visit_date, DAY_PART_ORDER[visit.day_part], visit.visit_time or time.min
 
 
 def team_dashboard(db: Session, principal: Principal, start: date, end: date) -> TeamDashboard:
@@ -139,7 +149,7 @@ def team_missed(
     A product narrows it to contacts not given that product: the contacts that missed out on it."""
     rbac_service.require_scope(principal, Perm.ADMIN_DASHBOARD)
     month_visits = visits_service.team_visits(db, principal.user_id, day.replace(day=1), day)
-    visited = {visit.contact_id for visit in month_visits}
+    visited = visits_service.listed_contact_ids(month_visits)
     contacts = contacts_service.active_contacts_in_subzones(db, territories_service.active_subzone_ids(db))
     places = territories_service.subzone_locations(db, {contact.subzone_id for contact in contacts})
     lines = [
@@ -179,7 +189,7 @@ def team_calls(
     ]
     names: dict[int, str] = {}
     lines: list[TeamCallLine] = []
-    for visit in sorted(selected, key=lambda visit: (visit.visit_date, visit.visit_time)):
+    for visit in sorted(selected, key=_call_order):
         if visit.user_id not in names:
             member = users_service.get_by_id(db, visit.user_id)
             names[visit.user_id] = member.full_name if member else "Unknown"
@@ -187,6 +197,7 @@ def team_calls(
             TeamCallLine(
                 visit_date=visit.visit_date,
                 visit_time=visit.visit_time,
+                day_part=visit.day_part,
                 rep_name=names[visit.user_id],
                 contact_name=visit.contact_name,
                 category_name=visit.category_name,
@@ -206,7 +217,8 @@ def _daily(
     calls = Counter(visit.visit_date for visit in visits)
     contacts_by_day: dict[date, set[int]] = defaultdict(set)
     for visit in month_visits:
-        contacts_by_day[visit.visit_date].add(visit.contact_id)
+        if visit.contact_id is not None:
+            contacts_by_day[visit.visit_date].add(visit.contact_id)
     seen = {contact for day, contacts in contacts_by_day.items() if day < start for contact in contacts}
     points: list[DayPoint] = []
     for day in _days_between(start, end):
@@ -264,7 +276,7 @@ def _summary(
     working: dict[int, int],
     period_days: int,
 ) -> TeamSummary:
-    contacts = len({visit.contact_id for visit in month_visits})
+    contacts = len(visits_service.listed_contact_ids(month_visits))
     rep_days = sum(working.values())
     return TeamSummary(
         calls=len(visits),
@@ -293,7 +305,7 @@ def _employee(
     mine = [visit for visit in visits if visit.user_id == reporter.user_id]
     days = sum(1 for day in ended if day.user_id == reporter.user_id)
     working_days = working.get(reporter.user_id, 0)
-    contacts = len({visit.contact_id for visit in month_visits if visit.user_id == reporter.user_id})
+    contacts = len(visits_service.listed_contact_ids([visit for visit in month_visits if visit.user_id == reporter.user_id]))
     return EmployeeLine(
         user_id=reporter.user_id,
         full_name=reporter.full_name,
@@ -317,7 +329,7 @@ def _zones(db: Session, visits: list[VisitRead], month_visits: list[VisitRead]) 
     lines = []
     for zone_id, name in names.items():
         zone_visits = [visit for visit in visits if visit.zone_id == zone_id]
-        contacts = len({visit.contact_id for visit in month_visits if visit.zone_id == zone_id})
+        contacts = len(visits_service.listed_contact_ids([visit for visit in month_visits if visit.zone_id == zone_id]))
         total = contacts_service.count_active_in_subzones(db, subzones_by_zone[zone_id])
         lines.append(
             ZoneLine(
@@ -346,7 +358,7 @@ def _products(visits: list[VisitRead]) -> list[ProductLine]:
                 product_id=product_id,
                 name=names[product_id],
                 calls=len(product_visits),
-                contacts_visited=len({visit.contact_id for visit in product_visits}),
+                contacts_visited=len(visits_service.listed_contact_ids(product_visits)),
                 reps=len({visit.user_id for visit in product_visits}),
             )
             for product_id, product_visits in by_product.items()
@@ -363,7 +375,7 @@ def _categories(visits: list[VisitRead]) -> list[CategoryLine]:
         CategoryLine(
             category_name=name,
             calls=len(category_visits),
-            contacts_visited=len({visit.contact_id for visit in category_visits}),
+            contacts_visited=len(visits_service.listed_contact_ids(category_visits)),
         )
         for name, category_visits in sorted(by_category.items())
     ]
@@ -392,7 +404,7 @@ def _row(db: Session, member, start: date, end: date, visits, days) -> MemberRow
         role_name=member.role_name,
         is_active=member.is_active,
         calls=len(mine),
-        contacts_visited=len({visit.contact_id for visit in mine}),
+        contacts_visited=len(visits_service.listed_contact_ids(mine)),
         coverage_total=coverage_total,
         days_reported=ended,
         days_leave=leave,
@@ -428,6 +440,87 @@ def _subzones_of(db: Session, territory_ids: set[int]) -> set[int]:
 
 def _days_between(start: date, end: date) -> list[date]:
     return [start + timedelta(days=offset) for offset in range((end - start).days + 1)]
+
+
+def unlisted_patches(db: Session, principal: Principal, start: date, end: date) -> list[UnlistedPatchLine]:
+    """Per patch: unlisted doctors and chemists still open, converted ones, and the calls made on them in the period."""
+    _check_range(start, end)
+    rbac_service.require_scope(principal, Perm.ADMIN_DASHBOARD)
+    items_by_patch: dict[int, list[UnlistedRead]] = defaultdict(list)
+    for item in visits_service.team_unlisted(db):
+        items_by_patch[item.subzone_id].append(item)
+    calls_by_patch = _unlisted_calls_by(_unlisted_visits(db, principal, start, end), lambda visit: visit.subzone_id)
+    lines = [
+        _patch_line(items, calls_by_patch.get(subzone_id, []))
+        for subzone_id, items in items_by_patch.items()
+    ]
+    return sorted(lines, key=lambda line: (line.zone_name, line.subzone_name))
+
+
+def unlisted_patch_contacts(
+    db: Session, principal: Principal, subzone_id: int, start: date, end: date
+) -> list[UnlistedContactLine]:
+    """Each unlisted doctor or chemist in one patch, with the calls made on them in the period."""
+    _check_range(start, end)
+    rbac_service.require_scope(principal, Perm.ADMIN_DASHBOARD)
+    items = [item for item in visits_service.team_unlisted(db) if item.subzone_id == subzone_id]
+    calls_by_contact = _unlisted_calls_by(_unlisted_visits(db, principal, start, end), lambda visit: visit.unlisted_contact_id)
+    return [_contact_line(item, calls_by_contact.get(item.id, [])) for item in sorted(items, key=lambda item: item.name)]
+
+
+def _unlisted_visits(db: Session, principal: Principal, start: date, end: date) -> list[VisitRead]:
+    return [
+        visit
+        for visit in visits_service.team_visits(db, principal.user_id, start, end)
+        if visit.unlisted_contact_id is not None
+    ]
+
+
+def _unlisted_calls_by(visits: list[VisitRead], key: Callable[[VisitRead], int]) -> dict[int, list[VisitRead]]:
+    grouped: dict[int, list[VisitRead]] = defaultdict(list)
+    for visit in visits:
+        grouped[key(visit)].append(visit)
+    return grouped
+
+
+def _patch_line(items: list[UnlistedRead], calls: list[VisitRead]) -> UnlistedPatchLine:
+    first = items[0]
+    return UnlistedPatchLine(
+        subzone_id=first.subzone_id,
+        subzone_name=first.subzone_name,
+        zone_name=first.zone_name,
+        unlisted=sum(1 for item in items if item.status == "unlisted"),
+        converted=sum(1 for item in items if item.status == "converted"),
+        calls=len(calls),
+        reps=len({visit.user_id for visit in calls}),
+        categories=_unlisted_categories(calls),
+    )
+
+
+def _unlisted_categories(calls: list[VisitRead]) -> list[UnlistedCategoryLine]:
+    by_category: dict[str, list[VisitRead]] = defaultdict(list)
+    for visit in calls:
+        by_category[visit.category_name].append(visit)
+    return [
+        UnlistedCategoryLine(
+            category_name=name,
+            calls=len(category_calls),
+            contacts=len({visit.unlisted_contact_id for visit in category_calls}),
+        )
+        for name, category_calls in sorted(by_category.items())
+    ]
+
+
+def _contact_line(item: UnlistedRead, calls: list[VisitRead]) -> UnlistedContactLine:
+    return UnlistedContactLine(
+        unlisted_id=item.id,
+        name=item.name,
+        category_name=item.category_name,
+        status=item.status,
+        calls=len(calls),
+        reps=len({visit.user_id for visit in calls}),
+        last_visit=max((visit.visit_date for visit in calls), default=None),
+    )
 
 
 def _check_range(start: date, end: date) -> None:

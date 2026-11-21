@@ -8,10 +8,10 @@ class VisitService {
 
   final ApiService _api;
 
-  /// The reps who can join a call on this contact.
-  Future<List<JointPartner>> listJointPartners(int contactId) =>
+  /// The reps who can join a call made in this patch.
+  Future<List<JointPartner>> listJointPartners(int subzoneId) =>
       _api.getData<List<JointPartner>>(
-        '/visits/joint-partners?contact_id=$contactId',
+        '/visits/joint-partners?subzone_id=$subzoneId',
         (data) {
           final items = data as List<Object?>;
           return [
@@ -65,8 +65,9 @@ class VisitService {
   /// Records one call. The server checks the date against the grace period and the caller's territories.
   Future<void> recordVisit({
     required int contactId,
+    bool isUnlisted = false,
     required DateTime visitDate,
-    required String visitTime,
+    required String dayPart,
     required String remarks,
     required List<int> productIds,
     int? partnerUserId,
@@ -74,9 +75,12 @@ class VisitService {
     '/visits',
     (_) {},
     body: {
-      'contact_id': contactId,
+      if (isUnlisted)
+        'unlisted_contact_id': contactId
+      else
+        'contact_id': contactId,
       'visit_date': _date(visitDate),
-      'visit_time': visitTime,
+      'day_part': dayPart,
       'remarks': remarks,
       'product_ids': productIds,
       'partner_user_id': partnerUserId,
@@ -86,7 +90,7 @@ class VisitService {
   /// Changes a call while its day is open. The partner is sent as null to remove one.
   Future<void> updateVisit({
     required int visitId,
-    required String visitTime,
+    required String dayPart,
     required String remarks,
     required List<int> productIds,
     int? partnerUserId,
@@ -94,7 +98,7 @@ class VisitService {
     '/visits/$visitId',
     (_) {},
     body: {
-      'visit_time': visitTime,
+      'day_part': dayPart,
       'remarks': remarks,
       'product_ids': productIds,
       'partner_user_id': partnerUserId,

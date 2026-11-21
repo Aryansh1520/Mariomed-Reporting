@@ -1004,7 +1004,9 @@ class _CallsCardState extends State<_CallsCard> {
     final shown = onDay.where((call) => _filter.matches(call.status)).toList()
       ..sort((a, b) {
         final byDate = a.visitDate.compareTo(b.visitDate);
-        final order = byDate != 0 ? byDate : a.visitTime.compareTo(b.visitTime);
+        final order = byDate != 0
+            ? byDate
+            : compareCallTimes(a.dayPart, a.visitTime, b.dayPart, b.visitTime);
         return _newestFirst ? -order : order;
       });
     return Container(
@@ -1159,7 +1161,7 @@ class _CallRow extends StatelessWidget {
                   ),
                   const SizedBox(height: AppSpace.xs),
                   Text(
-                    '${formatDay(call.visitDate)}  ·  ${call.visitTime.substring(0, 5)}',
+                    '${formatDay(call.visitDate)}  ·  ${callTimeLabel(call.dayPart, call.visitTime)}',
                     style: text.bodySmall?.copyWith(color: p.inkMuted),
                   ),
                   if (call.products.isNotEmpty) ...[
@@ -1292,7 +1294,10 @@ class _CallDetailSheet extends StatelessWidget {
               ),
               const SizedBox(height: AppSpace.l),
               _DetailLine(label: 'Date', value: formatDay(call.visitDate)),
-              _DetailLine(label: 'Time', value: call.visitTime.substring(0, 5)),
+              _DetailLine(
+                label: 'Time',
+                value: callTimeLabel(call.dayPart, call.visitTime),
+              ),
               _DetailLine(
                 label: 'Products',
                 value: call.products.isEmpty

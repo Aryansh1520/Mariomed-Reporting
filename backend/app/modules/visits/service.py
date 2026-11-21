@@ -1,11 +1,12 @@
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.exceptions import BadRequest, Conflict, Forbidden, NotFound
+from app.core.pagination import Page
 from app.modules.audit import service as audit
 from app.modules.contacts import service as contacts_service
 from app.modules.contacts.schemas import ContactRef
@@ -17,12 +18,17 @@ from app.modules.territories import service as territories_service
 from app.modules.territories.schemas import SubzoneRef
 from app.modules.users import service as users_service
 from app.modules.visits import repository
-from app.modules.visits.models import Visit, VisitDay, VisitParticipation
+from app.modules.visits.models import UnlistedContact, Visit, VisitDay, VisitParticipation
 from app.modules.visits.schemas import (
+    DayPart,
     DisputeDecision,
     JointPartnerRead,
     JointRequestRead,
     ProductRef,
+    UnlistedCreate,
+    UnlistedListQuery,
+    UnlistedRead,
+    UnlistedSimilarQuery,
     VisitCreate,
     VisitDayRead,
     VisitRead,
@@ -45,13 +51,28 @@ PARTNER_IS_SELF = "You cannot add yourself as the joint partner."
 PARTNER_OUTSIDE = "The joint partner must be assigned to the same headquarter or patch."
 JOINT_NOT_FOUND = "This joint call does not exist."
 JOINT_CLOSED = "This joint call has already been answered."
+UNLISTED_NOT_FOUND = "This unlisted contact does not exist."
+UNLISTED_CONVERTED = "This contact has been converted to a listed contact. Record the call on the listed contact."
+UNLISTED_ALREADY_CONVERTED = "This unlisted contact has already been converted."
+UNLISTED_SUBJECT_FIXED = "A call on an unlisted contact stays on that contact."
+PATCH_NOT_FOUND = "Choose an active patch for this contact."
+PATCH_REQUIRED = "Choose the patch for this call."
+PATCH_NOT_YOURS = "This patch is not one of your territories."
+
+
+@dataclass(frozen=True)
+class _Subject:
+    """Who a call is on: a listed contact, or an unlisted doctor or chemist. Exactly one is set."""
+
+    contact_id: int | None
+    unlisted_contact_id: int | None
 
 
 @dataclass(frozen=True)
 class _Placement:
     """Where a visit sits and who joined it, after the caller's territories are checked."""
 
-    contact_id: int
+    subject: _Subject
     zone_id: int
     subzone_id: int
     partner_user_id: int | None
@@ -62,6 +83,7 @@ class _Lookups:
     """Names and states a batch of visits needs, fetched once for the whole batch."""
 
     contacts: dict[int, ContactRef]
+    unlisted: dict[int, tuple[UnlistedContact, str]]
     subzones: dict[int, SubzoneRef]
     product_ids: dict[int, list[int]]
     product_names: dict[int, str]
@@ -76,17 +98,20 @@ def record_visit(db: Session, principal: Principal, data: VisitCreate) -> VisitR
     _ensure_in_window(data.visit_date)
     ensure_not_sunday(data.visit_date)
     day = _open_day(db, principal, data.visit_date)
-    placement = _placement(db, principal, data.contact_id, data.partner_user_id)
+    placement = _subject_placement(db, principal, _Subject(data.contact_id, data.unlisted_contact_id), data.partner_user_id)
     product_ids = sorted(set(data.product_ids))
     products_service.require_active_products(db, set(product_ids))
+    visit_time, day_part = _when(data.visit_time, data.day_part)
     visit = repository.add(
         db,
         Visit(
             day_id=day.id,
             user_id=principal.user_id,
             visit_date=data.visit_date,
-            visit_time=data.visit_time,
-            contact_id=placement.contact_id,
+            visit_time=visit_time,
+            day_part=day_part,
+            contact_id=placement.subject.contact_id,
+            unlisted_contact_id=placement.subject.unlisted_contact_id,
             zone_id=placement.zone_id,
             subzone_id=placement.subzone_id,
             remarks=data.remarks,
@@ -106,19 +131,25 @@ def update_visit(db: Session, principal: Principal, visit_id: int, data: VisitUp
     rbac_service.require_scope(principal, Perm.VISITS_MANAGE)
     ensure_field_reporting(principal)
     visit = _editable_visit(db, principal, visit_id)
-    contact_id = data.contact_id if data.contact_id is not None else visit.contact_id
+    if data.contact_id is not None and visit.unlisted_contact_id is not None:
+        raise BadRequest(UNLISTED_SUBJECT_FIXED)
+    subject = _Subject(
+        contact_id=data.contact_id if data.contact_id is not None else visit.contact_id,
+        unlisted_contact_id=visit.unlisted_contact_id,
+    )
     partner_id = data.partner_user_id if "partner_user_id" in data.model_fields_set else visit.partner_user_id
-    placement = _placement(db, principal, contact_id, partner_id)
+    placement = _subject_placement(db, principal, subject, partner_id)
     if data.product_ids is not None:
         product_ids = sorted(set(data.product_ids))
         products_service.require_active_products(db, set(product_ids))
         repository.set_products(db, visit.id, product_ids)
-    visit.contact_id = placement.contact_id
+    visit.contact_id = placement.subject.contact_id
+    visit.unlisted_contact_id = placement.subject.unlisted_contact_id
     visit.zone_id = placement.zone_id
     visit.subzone_id = placement.subzone_id
     visit.partner_user_id = placement.partner_user_id
-    if data.visit_time is not None:
-        visit.visit_time = data.visit_time
+    if data.visit_time is not None or data.day_part is not None:
+        visit.visit_time, visit.day_part = _when(data.visit_time, data.day_part)
     if data.remarks is not None:
         visit.remarks = data.remarks
     visit.updated_by = principal.user_id
@@ -197,11 +228,18 @@ def list_joint_requests(db: Session, principal: Principal) -> list[JointRequestR
     return [_joint_read(participation, visit, lookups) for participation, visit in rows]
 
 
-def list_joint_partners(db: Session, principal: Principal, contact_id: int) -> list[JointPartnerRead]:
-    """The other reps assigned to the contact's zone or subzone, who can join a call on that contact."""
+def list_joint_partners(
+    db: Session, principal: Principal, subzone_id: int | None, contact_id: int | None
+) -> list[JointPartnerRead]:
+    """The other reps assigned to the patch's zone or subzone, who can join a call made in that patch.
+    Older app versions name a contact instead of the patch, so the patch is taken from that contact."""
     rbac_service.require_scope(principal, Perm.VISITS_MANAGE)
-    contact = contacts_service.reachable_contact(db, principal, contact_id)
-    user_ids = territories_service.users_assigned_to_subzone(db, contact.subzone_id) - {principal.user_id}
+    if subzone_id is None:
+        if contact_id is None:
+            raise BadRequest(PATCH_REQUIRED)
+        subzone_id = contacts_service.reachable_contact(db, principal, contact_id).subzone_id
+    _ensure_patch_open(db, principal, subzone_id, Perm.VISITS_MANAGE)
+    user_ids = territories_service.users_assigned_to_subzone(db, subzone_id) - {principal.user_id}
     partners = sorted(users_service.active_by_ids(db, user_ids), key=lambda user: user.full_name)
     return [JointPartnerRead(user_id=user.id, full_name=user.full_name) for user in partners]
 
@@ -287,16 +325,41 @@ def _editable_visit(db: Session, principal: Principal, visit_id: int) -> Visit:
     return visit
 
 
-def _placement(db: Session, principal: Principal, contact_id: int, partner_user_id: int | None) -> _Placement:
-    contact = contacts_service.reachable_contact(db, principal, contact_id)
-    location = territories_service.subzone_locations(db, {contact.subzone_id})[contact.subzone_id]
-    partner_id = _checked_partner(db, principal.user_id, partner_user_id, contact.subzone_id)
+def _subject_placement(db: Session, principal: Principal, subject: _Subject, partner_user_id: int | None) -> _Placement:
+    if subject.unlisted_contact_id is None:
+        contact = contacts_service.reachable_contact(db, principal, subject.contact_id)
+        subzone_id = contact.subzone_id
+        subject = _Subject(contact_id=contact.id, unlisted_contact_id=None)
+    else:
+        subzone_id = _reachable_unlisted(db, principal, subject.unlisted_contact_id).subzone_id
+    location = territories_service.subzone_locations(db, {subzone_id})[subzone_id]
     return _Placement(
-        contact_id=contact.id,
+        subject=subject,
         zone_id=location.zone_id,
-        subzone_id=contact.subzone_id,
-        partner_user_id=partner_id,
+        subzone_id=subzone_id,
+        partner_user_id=_checked_partner(db, principal.user_id, partner_user_id, subzone_id),
     )
+
+
+def _reachable_unlisted(db: Session, principal: Principal, unlisted_id: int) -> UnlistedContact:
+    """An unlisted contact the caller may record on. A converted one must be recorded on its listed contact instead."""
+    unlisted = repository.get_unlisted(db, unlisted_id)
+    visible = territories_service.visible_territory_ids(db, principal, Perm.VISITS_MANAGE)
+    active = territories_service.active_subzone_ids(db)
+    if unlisted is None or unlisted.subzone_id not in active or (visible is not None and unlisted.subzone_id not in visible):
+        raise NotFound(UNLISTED_NOT_FOUND)
+    if unlisted.status == "converted":
+        raise BadRequest(UNLISTED_CONVERTED)
+    return unlisted
+
+
+def _ensure_patch_open(db: Session, principal: Principal, subzone_id: int, code: Perm) -> None:
+    """The patch must be active and within the caller's territories for this permission."""
+    if subzone_id not in territories_service.active_subzone_ids(db):
+        raise BadRequest(PATCH_NOT_FOUND)
+    visible = territories_service.visible_territory_ids(db, principal, code)
+    if visible is not None and subzone_id not in visible:
+        raise Forbidden(PATCH_NOT_YOURS)
 
 
 def _checked_partner(db: Session, reporter_id: int, partner_id: int | None, subzone_id: int) -> int | None:
@@ -325,7 +388,8 @@ def _lookups(db: Session, visits: list[Visit]) -> _Lookups:
     product_ids = repository.products_of_visits(db, visit_ids)
     all_products = {product_id for ids in product_ids.values() for product_id in ids}
     return _Lookups(
-        contacts=contacts_service.contact_summaries(db, {visit.contact_id for visit in visits}),
+        contacts=contacts_service.contact_summaries(db, {visit.contact_id for visit in visits if visit.contact_id is not None}),
+        unlisted=repository.unlisted_with_category(db, {visit.unlisted_contact_id for visit in visits if visit.unlisted_contact_id is not None}),
         subzones=territories_service.subzone_locations(db, {visit.subzone_id for visit in visits}),
         product_ids=product_ids,
         product_names=products_service.product_names(db, all_products),
@@ -340,8 +404,17 @@ def _read_many(db: Session, visits: list[Visit], viewer_id: int) -> list[VisitRe
     return [_visit_read(visit, lookups, viewer_id) for visit in visits]
 
 
-def _visit_read(visit: Visit, lookups: _Lookups, viewer_id: int) -> VisitRead:
+def _subject_names(visit: Visit, lookups: _Lookups) -> tuple[str, str, str | None]:
+    """The name, category and type of whoever the call was on: a listed contact, or an unlisted one."""
+    if visit.unlisted_contact_id is not None:
+        unlisted, category_name = lookups.unlisted[visit.unlisted_contact_id]
+        return unlisted.name, category_name, None
     contact = lookups.contacts[visit.contact_id]
+    return contact.name, contact.category_name, contact.type_name
+
+
+def _visit_read(visit: Visit, lookups: _Lookups, viewer_id: int) -> VisitRead:
+    name, category_name, type_name = _subject_names(visit, lookups)
     subzone = lookups.subzones[visit.subzone_id]
     participation = lookups.participations.get(visit.id)
     return VisitRead(
@@ -350,12 +423,14 @@ def _visit_read(visit: Visit, lookups: _Lookups, viewer_id: int) -> VisitRead:
         rep_name=lookups.rep_names.get(visit.user_id, ""),
         visit_date=visit.visit_date,
         visit_time=visit.visit_time,
+        day_part=visit.day_part,
         status=visit.status,
         remarks=visit.remarks,
-        contact_id=contact.id,
-        contact_name=contact.name,
-        category_name=contact.category_name,
-        type_name=contact.type_name,
+        contact_id=visit.contact_id,
+        unlisted_contact_id=visit.unlisted_contact_id,
+        contact_name=name,
+        category_name=category_name,
+        type_name=type_name,
         zone_id=subzone.zone_id,
         zone_name=subzone.zone_name,
         subzone_id=subzone.id,
@@ -371,16 +446,17 @@ def _visit_read(visit: Visit, lookups: _Lookups, viewer_id: int) -> VisitRead:
 
 
 def _joint_read(participation: VisitParticipation, visit: Visit, lookups: _Lookups) -> JointRequestRead:
-    contact = lookups.contacts[visit.contact_id]
+    name, category_name, type_name = _subject_names(visit, lookups)
     subzone = lookups.subzones[visit.subzone_id]
     return JointRequestRead(
         visit_id=visit.id,
         initiator_user_id=visit.user_id,
         visit_date=visit.visit_date,
         visit_time=visit.visit_time,
-        contact_name=contact.name,
-        category_name=contact.category_name,
-        type_name=contact.type_name,
+        day_part=visit.day_part,
+        contact_name=name,
+        category_name=category_name,
+        type_name=type_name,
         zone_name=subzone.zone_name,
         subzone_name=subzone.name,
         remarks=visit.remarks,
@@ -392,6 +468,21 @@ def _joint_read(participation: VisitParticipation, visit: Visit, lookups: _Looku
 
 def _product_refs(visit_id: int, lookups: _Lookups) -> list[ProductRef]:
     return [ProductRef(id=pid, name=lookups.product_names[pid]) for pid in lookups.product_ids.get(visit_id, [])]
+
+
+def _when(visit_time: time | None, day_part: DayPart | None) -> tuple[time | None, DayPart]:
+    """A clock time from an older app also sets the part of the day. Otherwise the part of the day is stored alone."""
+    if visit_time is not None:
+        return visit_time, _day_part_for(visit_time)
+    return None, day_part
+
+
+def _day_part_for(value: time) -> DayPart:
+    if value < time(12):
+        return "morning"
+    if value < time(17):
+        return "afternoon"
+    return "evening"
 
 
 def _day_read(day: VisitDay) -> VisitDayRead:
@@ -514,3 +605,87 @@ def resolve_dispute(db: Session, principal: Principal, visit_id: int, decision: 
     audit.record(db, principal.user_id, f"visit.dispute_{decision}", "visit", visit.id)
     db.commit()
     return _read_many(db, [visit], principal.user_id)[0]
+
+
+def listed_contact_ids(visits: list[VisitRead]) -> set[int]:
+    """The listed contacts the calls were made on. Calls on unlisted doctors and chemists are left out, so coverage counts only listed contacts."""
+    return {visit.contact_id for visit in visits if visit.contact_id is not None}
+
+
+def create_unlisted(db: Session, principal: Principal, data: UnlistedCreate) -> UnlistedRead:
+    rbac_service.require_scope(principal, Perm.VISITS_MANAGE)
+    ensure_field_reporting(principal)
+    _ensure_patch_open(db, principal, data.subzone_id, Perm.VISITS_MANAGE)
+    contacts_service.ensure_category_active(db, data.category_id)
+    unlisted = repository.add(
+        db,
+        UnlistedContact(
+            name=data.name,
+            category_id=data.category_id,
+            subzone_id=data.subzone_id,
+            status="unlisted",
+            created_by=principal.user_id,
+            updated_by=principal.user_id,
+        ),
+    )
+    audit.record(db, principal.user_id, "unlisted_contact.create", "unlisted_contact", unlisted.id)
+    db.commit()
+    return _unlisted_read(db, unlisted)
+
+
+def list_unlisted(db: Session, principal: Principal, query: UnlistedListQuery) -> Page[UnlistedRead]:
+    rbac_service.require_scope(principal, Perm.CONTACTS_READ)
+    _ensure_patch_open(db, principal, query.subzone_id, Perm.CONTACTS_READ)
+    rows, total = repository.list_unlisted(db, query.subzone_id, query.include_converted, query.offset, query.page_size)
+    return Page[UnlistedRead](items=_unlisted_reads(db, rows), total=total, page=query.page, page_size=query.page_size)
+
+
+def find_similar_unlisted(db: Session, principal: Principal, query: UnlistedSimilarQuery) -> list[UnlistedRead]:
+    """Unlisted contacts already in the patch under the same name. The rep decides whether to reuse one."""
+    rbac_service.require_scope(principal, Perm.VISITS_MANAGE)
+    _ensure_patch_open(db, principal, query.subzone_id, Perm.VISITS_MANAGE)
+    return _unlisted_reads(db, repository.matching_unlisted(db, query.subzone_id, query.name))
+
+
+def convert_unlisted(db: Session, principal: Principal, unlisted_id: int) -> UnlistedRead:
+    """Flags an unlisted contact as converted. Its past calls stay on it; new calls go to the listed contact."""
+    rbac_service.require_scope(principal, Perm.CONTACTS_MANAGE)
+    unlisted = repository.get_unlisted(db, unlisted_id)
+    visible = territories_service.visible_territory_ids(db, principal, Perm.CONTACTS_MANAGE)
+    if unlisted is None or (visible is not None and unlisted.subzone_id not in visible):
+        raise NotFound(UNLISTED_NOT_FOUND)
+    if unlisted.status == "converted":
+        raise Conflict(UNLISTED_ALREADY_CONVERTED)
+    unlisted.status = "converted"
+    unlisted.updated_by = principal.user_id
+    audit.record(db, principal.user_id, "unlisted_contact.convert", "unlisted_contact", unlisted.id)
+    db.commit()
+    return _unlisted_read(db, unlisted)
+
+
+def team_unlisted(db: Session) -> list[UnlistedRead]:
+    """Every unlisted contact, converted ones included. The admin's unlisted report reads it."""
+    return _unlisted_reads(db, repository.list_all_unlisted(db))
+
+
+def _unlisted_read(db: Session, unlisted: UnlistedContact) -> UnlistedRead:
+    _, category_name = repository.unlisted_with_category(db, {unlisted.id})[unlisted.id]
+    return _unlisted_reads(db, [(unlisted, category_name)])[0]
+
+
+def _unlisted_reads(db: Session, rows: list[tuple[UnlistedContact, str]]) -> list[UnlistedRead]:
+    places = territories_service.subzone_locations(db, {row.subzone_id for row, _ in rows})
+    return [
+        UnlistedRead(
+            id=row.id,
+            name=row.name,
+            category_id=row.category_id,
+            category_name=category_name,
+            subzone_id=row.subzone_id,
+            subzone_name=places[row.subzone_id].name,
+            zone_id=places[row.subzone_id].zone_id,
+            zone_name=places[row.subzone_id].zone_name,
+            status=row.status,
+        )
+        for row, category_name in rows
+    ]

@@ -35,7 +35,9 @@ class VisitRecordController extends GetxController {
 
   final remarks = TextEditingController();
   final visitDate = Rx<DateTime>(_today());
-  final visitTime = Rx<TimeOfDay>(TimeOfDay.fromDateTime(indiaNow()));
+
+  /// Chosen by the rep. Starts empty for a new call: it is mandatory.
+  final dayPart = Rxn<String>();
   final products = <Product>[].obs;
   final selectedProductIds = <int>{}.obs;
   final partners = <JointPartner>[].obs;
@@ -57,7 +59,7 @@ class VisitRecordController extends GetxController {
     if (visit != null) {
       remarks.text = visit.remarks;
       visitDate.value = visit.visitDate;
-      visitTime.value = visit.time;
+      dayPart.value = visit.dayPart;
       selectedProductIds.addAll(visit.products.map((product) => product.id));
     }
     load();
@@ -80,7 +82,7 @@ class VisitRecordController extends GetxController {
               product.isActive || selectedProductIds.contains(product.id),
         ),
       );
-      partners.assignAll(await _visits.listJointPartners(contact.id));
+      partners.assignAll(await _visits.listJointPartners(contact.subzoneId));
       _restorePartner();
     } on AppException catch (e) {
       loadError.value = e.message;
@@ -107,7 +109,7 @@ class VisitRecordController extends GetxController {
 
   void setDate(DateTime value) => visitDate.value = DateUtils.dateOnly(value);
 
-  void setTime(TimeOfDay value) => visitTime.value = value;
+  void setDayPart(String value) => dayPart.value = value;
 
   void setPartner(JointPartner? value) => partner.value = value;
 
@@ -119,14 +121,17 @@ class VisitRecordController extends GetxController {
       return 'Choose at least one product you promoted.';
     if (isSunday(visitDate.value))
       return 'Sunday is a leave day for everyone. No calls can be recorded on it.';
+    final part = dayPart.value;
+    if (part == null) return 'Choose the part of the day for this call.';
     isSaving.value = true;
     try {
       final visit = args.visit;
       if (visit == null) {
         await _visits.recordVisit(
           contactId: contact.id,
+          isUnlisted: contact.isUnlisted,
           visitDate: visitDate.value,
-          visitTime: _timeText(visitTime.value),
+          dayPart: part,
           remarks: text,
           productIds: selectedProductIds.toList(),
           partnerUserId: partner.value?.userId,
@@ -134,7 +139,7 @@ class VisitRecordController extends GetxController {
       } else {
         await _visits.updateVisit(
           visitId: visit.id,
-          visitTime: _timeText(visitTime.value),
+          dayPart: part,
           remarks: text,
           productIds: selectedProductIds.toList(),
           partnerUserId: partner.value?.userId,
@@ -149,7 +154,4 @@ class VisitRecordController extends GetxController {
   }
 
   static DateTime _today() => indiaToday();
-
-  static String _timeText(TimeOfDay value) =>
-      '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}:00';
 }

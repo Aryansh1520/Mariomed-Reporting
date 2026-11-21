@@ -47,3 +47,29 @@ const _monthNames = [
 /// A day as it reads on a form, such as "28 Oct 2026".
 String formatDay(DateTime day) =>
     '${day.day} ${_monthNames[day.month - 1]} ${day.year}';
+
+/// A date as the API takes it in a query or a path: yyyy-mm-dd.
+String apiDate(DateTime value) =>
+    '${value.year.toString().padLeft(4, '0')}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
+
+/// The parts of the day a call can be placed in, in the order they fall in a day.
+const dayPartOptions = ['morning', 'afternoon', 'evening'];
+
+String dayPartLabel(String dayPart) => _capitalise(dayPart);
+
+/// A call's time as lists show it: the clock time for a call logged with one, otherwise its part of the day.
+String callTimeLabel(String dayPart, String? visitTime) =>
+    visitTime == null ? dayPartLabel(dayPart) : visitTime.substring(0, 5);
+
+/// Orders calls within a day: by part of the day, then by clock time for calls logged with one.
+int compareCallTimes(
+  String aDayPart,
+  String? aVisitTime,
+  String bDayPart,
+  String? bVisitTime,
+) {
+  final byPart = dayPartOptions
+      .indexOf(aDayPart)
+      .compareTo(dayPartOptions.indexOf(bDayPart));
+  return byPart != 0 ? byPart : (aVisitTime ?? '').compareTo(bVisitTime ?? '');
+}

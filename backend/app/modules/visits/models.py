@@ -29,14 +29,25 @@ class Visit(AuditFieldsMixin, Base):
     __tablename__ = "visits"
     __table_args__ = (
         CheckConstraint("status IN ('open', 'completed', 'disputed')", name="ck_visits_status"),
+        CheckConstraint("day_part IN ('morning', 'afternoon', 'evening')", name="ck_visits_day_part"),
+        CheckConstraint(
+            "(contact_id IS NULL) <> (unlisted_contact_id IS NULL)", name="ck_visits_one_subject"
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     day_id: Mapped[int] = mapped_column(ForeignKey("visit_days.id", ondelete="CASCADE"), index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), index=True)
     visit_date: Mapped[date] = mapped_column(Date)
-    visit_time: Mapped[time] = mapped_column(Time)
-    contact_id: Mapped[int] = mapped_column(ForeignKey("contacts.id", ondelete="RESTRICT"), index=True)
+    # Calls logged by older app versions carry a clock time. Newer ones carry only the part of the day.
+    # Once the old app is retired, visit_time can be dropped and day_part alone kept.
+    visit_time: Mapped[time | None] = mapped_column(Time, nullable=True)
+    day_part: Mapped[str] = mapped_column(String(10))
+    # Exactly one of these is set: a listed contact, or an unlisted doctor or chemist of the patch.
+    contact_id: Mapped[int | None] = mapped_column(ForeignKey("contacts.id", ondelete="RESTRICT"), index=True, nullable=True)
+    unlisted_contact_id: Mapped[int | None] = mapped_column(
+        ForeignKey("unlisted_contacts.id", ondelete="RESTRICT"), index=True, nullable=True
+    )
     zone_id: Mapped[int] = mapped_column(ForeignKey("territories.id", ondelete="RESTRICT"))
     subzone_id: Mapped[int] = mapped_column(ForeignKey("territories.id", ondelete="RESTRICT"))
     remarks: Mapped[str] = mapped_column(Text)
@@ -44,6 +55,22 @@ class Visit(AuditFieldsMixin, Base):
     partner_user_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="RESTRICT"), index=True, nullable=True
     )
+
+
+class UnlistedContact(AuditFieldsMixin, Base):
+    """A doctor or chemist a rep met that is not on the contact list. Kept per patch, and flagged once converted."""
+
+    __tablename__ = "unlisted_contacts"
+    __table_args__ = (
+        CheckConstraint("length(btrim(name)) > 0", name="ck_unlisted_contacts_name_not_blank"),
+        CheckConstraint("status IN ('unlisted', 'converted')", name="ck_unlisted_contacts_status"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(120))
+    category_id: Mapped[int] = mapped_column(ForeignKey("contact_categories.id", ondelete="RESTRICT"), index=True)
+    subzone_id: Mapped[int] = mapped_column(ForeignKey("territories.id", ondelete="RESTRICT"), index=True)
+    status: Mapped[str] = mapped_column(String(20), default="unlisted")
 
 
 visit_products = Table(

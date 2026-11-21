@@ -216,7 +216,8 @@ class CategoryLine {
 class TeamCallLine {
   const TeamCallLine({
     required this.visitDate,
-    required this.visitTime,
+    this.visitTime,
+    required this.dayPart,
     required this.repName,
     required this.contactName,
     required this.categoryName,
@@ -228,7 +229,8 @@ class TeamCallLine {
 
   factory TeamCallLine.fromJson(Map<String, Object?> json) => TeamCallLine(
     visitDate: DateTime.parse(json['visit_date'] as String),
-    visitTime: json['visit_time'] as String,
+    visitTime: json['visit_time'] as String?,
+    dayPart: json['day_part'] as String,
     repName: json['rep_name'] as String,
     contactName: json['contact_name'] as String,
     categoryName: json['category_name'] as String,
@@ -241,7 +243,8 @@ class TeamCallLine {
   );
 
   final DateTime visitDate;
-  final String visitTime;
+  final String? visitTime;
+  final String dayPart;
   final String repName;
   final String contactName;
   final String categoryName;

@@ -13,9 +13,32 @@ from app.modules.reports.schemas import (
     MissedContactLine,
     TeamCallLine,
     TeamDashboard,
+    UnlistedContactLine,
+    UnlistedPatchLine,
 )
 
 router = APIRouter()
+
+
+@router.get("/unlisted/patches", response_model=list[UnlistedPatchLine])
+def unlisted_patches(
+    date_from: date,
+    date_to: date,
+    principal: Principal = Depends(get_principal),
+    db: Session = Depends(get_db),
+) -> list[UnlistedPatchLine]:
+    return service.unlisted_patches(db, principal, date_from, date_to)
+
+
+@router.get("/unlisted/patches/{subzone_id}/contacts", response_model=list[UnlistedContactLine])
+def unlisted_patch_contacts(
+    subzone_id: int,
+    date_from: date,
+    date_to: date,
+    principal: Principal = Depends(get_principal),
+    db: Session = Depends(get_db),
+) -> list[UnlistedContactLine]:
+    return service.unlisted_patch_contacts(db, principal, subzone_id, date_from, date_to)
 
 
 @router.get("/team", response_model=TeamDashboard)

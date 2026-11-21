@@ -590,7 +590,7 @@ class _DayCallRow extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpace.xs),
                 Text(
-                  '${call.visitTime.substring(0, 5)}  ·  ${call.repName}  ·  ${call.zoneName}',
+                  '${callTimeLabel(call.dayPart, call.visitTime)}  ·  ${call.repName}  ·  ${call.zoneName}',
                   style: text.bodySmall?.copyWith(color: p.inkMuted),
                 ),
                 if (call.products.isNotEmpty) ...[

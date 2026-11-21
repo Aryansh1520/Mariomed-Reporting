@@ -1,8 +1,9 @@
 from datetime import date
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
+from app.core.pagination import Page
 from app.db.session import get_db
 from app.modules.auth.dependencies import get_principal
 from app.modules.rbac.principal import Principal
@@ -11,6 +12,10 @@ from app.modules.visits.schemas import (
     DisputeDecision,
     JointPartnerRead,
     JointRequestRead,
+    UnlistedCreate,
+    UnlistedListQuery,
+    UnlistedRead,
+    UnlistedSimilarQuery,
     VisitCreate,
     VisitDayRead,
     VisitRead,
@@ -42,11 +47,55 @@ def list_visits(
 
 @router.get("/joint-partners", response_model=list[JointPartnerRead])
 def list_joint_partners(
-    contact_id: int,
+    subzone_id: int | None = None,
+    contact_id: int | None = None,
     principal: Principal = Depends(get_principal),
     db: Session = Depends(get_db),
 ) -> list[JointPartnerRead]:
-    return service.list_joint_partners(db, principal, contact_id)
+    return service.list_joint_partners(db, principal, subzone_id, contact_id)
+
+
+@router.post("/unlisted-contacts", response_model=UnlistedRead)
+def create_unlisted(
+    body: UnlistedCreate,
+    principal: Principal = Depends(get_principal),
+    db: Session = Depends(get_db),
+) -> UnlistedRead:
+    return service.create_unlisted(db, principal, body)
+
+
+@router.get("/unlisted-contacts", response_model=Page[UnlistedRead])
+def list_unlisted(
+    subzone_id: int,
+    include_converted: bool = False,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=100, ge=1, le=100),
+    principal: Principal = Depends(get_principal),
+    db: Session = Depends(get_db),
+) -> Page[UnlistedRead]:
+    query = UnlistedListQuery(
+        subzone_id=subzone_id, include_converted=include_converted, page=page, page_size=page_size
+    )
+    return service.list_unlisted(db, principal, query)
+
+
+@router.get("/unlisted-contacts/similar", response_model=list[UnlistedRead])
+def find_similar_unlisted(
+    subzone_id: int,
+    name: str = Query(min_length=1, max_length=120),
+    principal: Principal = Depends(get_principal),
+    db: Session = Depends(get_db),
+) -> list[UnlistedRead]:
+    return service.find_similar_unlisted(db, principal, UnlistedSimilarQuery(subzone_id=subzone_id, name=name))
+
+
+@router.post("/unlisted-contacts/{unlisted_id}/convert", response_model=UnlistedRead)
+def convert_unlisted(
+    unlisted_id: int,
+    principal: Principal = Depends(get_principal),
+    db: Session = Depends(get_db),
+) -> UnlistedRead:
+    return service.convert_unlisted(db, principal, unlisted_id)
 
 
 @router.get("/days", response_model=list[VisitDayRead])

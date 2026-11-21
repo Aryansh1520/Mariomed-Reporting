@@ -141,7 +141,7 @@ def list_contacts(db: Session, principal: Principal, query: ContactListQuery) ->
 
 def create_contact(db: Session, principal: Principal, data: ContactCreate) -> ContactRead:
     rbac_service.require_scope(principal, Perm.CONTACTS_MANAGE)
-    _ensure_category_active(db, data.category_id)
+    ensure_category_active(db, data.category_id)
     if data.type_id is not None:
         _ensure_type_fits(db, data.type_id, data.category_id)
     _ensure_subzone_visible(db, principal, data.subzone_id, Perm.CONTACTS_MANAGE)
@@ -167,7 +167,7 @@ def update_contact(db: Session, principal: Principal, contact_id: int, data: Con
     contact = _manageable_contact(db, principal, contact_id)
     category_changed = data.category_id is not None and data.category_id != contact.category_id
     if data.category_id is not None:
-        _ensure_category_active(db, data.category_id)
+        ensure_category_active(db, data.category_id)
         contact.category_id = data.category_id
     if "type_id" in data.model_fields_set or category_changed:
         _set_type(db, contact, data.type_id if "type_id" in data.model_fields_set else None)
@@ -249,7 +249,7 @@ def _manageable_contact(db: Session, principal: Principal, contact_id: int) -> C
     return contact
 
 
-def _ensure_category_active(db: Session, category_id: int) -> None:
+def ensure_category_active(db: Session, category_id: int) -> None:
     category = repository.get_category(db, category_id)
     if category is None:
         raise BadRequest(CATEGORY_NOT_FOUND)

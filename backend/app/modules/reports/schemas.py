@@ -2,6 +2,8 @@ from datetime import date, time
 
 from pydantic import BaseModel
 
+from app.modules.visits.schemas import DayPart
+
 
 class MemberRow(BaseModel):
     """One person's performance over the chosen period."""
@@ -29,7 +31,8 @@ class DayLine(BaseModel):
 class CallLine(BaseModel):
     visit_id: int
     visit_date: date
-    visit_time: time
+    visit_time: time | None
+    day_part: DayPart
     contact_name: str
     category_name: str
     type_name: str | None
@@ -96,6 +99,35 @@ class CategoryLine(BaseModel):
     contacts_visited: int
 
 
+class UnlistedCategoryLine(BaseModel):
+    category_name: str
+    calls: int
+    contacts: int
+
+
+class UnlistedPatchLine(BaseModel):
+    """Unlisted doctors and chemists in one patch: how many are open, how many were converted, and the calls on them."""
+
+    subzone_id: int
+    subzone_name: str
+    zone_name: str
+    unlisted: int
+    converted: int
+    calls: int
+    reps: int
+    categories: list[UnlistedCategoryLine]
+
+
+class UnlistedContactLine(BaseModel):
+    unlisted_id: int
+    name: str
+    category_name: str
+    status: str
+    calls: int
+    reps: int
+    last_visit: date | None
+
+
 class DayPoint(BaseModel):
     """Calls made that day, and contacts in scope still unvisited at the end of it."""
 
@@ -106,7 +138,8 @@ class DayPoint(BaseModel):
 
 class TeamCallLine(BaseModel):
     visit_date: date
-    visit_time: time
+    visit_time: time | None
+    day_part: DayPart
     rep_name: str
     contact_name: str
     category_name: str

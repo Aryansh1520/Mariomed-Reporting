@@ -6,9 +6,12 @@ import '../../views/login/reset_password_view.dart';
 import '../../views/products/product_form_view.dart';
 import '../../views/contacts/categories_view.dart';
 import '../../views/products/products_view.dart';
+import '../../views/admin/unlisted_patch_view.dart';
+import '../../views/admin/unlisted_patches_view.dart';
 import '../../views/territories/territory_contacts_view.dart';
 import '../../views/shell/main_shell_view.dart';
 import '../bindings/login_binding.dart';
+import '../bindings/unlisted_binding.dart';
 import '../bindings/reset_password_binding.dart';
 import '../bindings/categories_binding.dart';
 import '../bindings/products_binding.dart';
@@ -106,6 +109,20 @@ abstract class AppPages {
       middlewares: [AuthGuard(), PermissionGuard('contacts.read')],
       page: () => const TerritoryContactsView(),
       binding: TerritoryContactsBinding(),
+      customTransition: _transition,
+    ),
+    GetPage(
+      name: AppRoutes.unlistedPatches,
+      middlewares: [AuthGuard(), PermissionGuard('admin.dashboard')],
+      page: () => const UnlistedPatchesView(),
+      binding: UnlistedPatchesBinding(),
+      customTransition: _transition,
+    ),
+    GetPage(
+      name: AppRoutes.unlistedPatch,
+      middlewares: [AuthGuard(), PermissionGuard('admin.dashboard')],
+      page: () => const UnlistedPatchView(),
+      binding: UnlistedPatchBinding(),
       customTransition: _transition,
     ),
   ];

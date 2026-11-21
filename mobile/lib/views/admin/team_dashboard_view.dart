@@ -35,6 +35,8 @@ class TeamDashboardSections extends StatelessWidget {
           child: _CallsPerDay(days: data.daily),
         ),
         const SizedBox(height: AppSpace.l),
+        _UnlistedLink(onTap: () => Get.toNamed(AppRoutes.unlistedPatches)),
+        const SizedBox(height: AppSpace.l),
         _SectionCard(
           icon: Iconsax.user,
           tone: _Tone.blue,
@@ -130,6 +132,37 @@ class TeamDashboardSections extends StatelessWidget {
     Get.to(
       () =>
           ZoneDetailView(zone: zone, from: team.from.value, to: team.to.value),
+    );
+  }
+}
+
+/// Opens the unlisted doctors and chemists of each patch: how many are open, converted, and the calls on them.
+class _UnlistedLink extends StatelessWidget {
+  const _UnlistedLink({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final text = Theme.of(context).textTheme;
+
+    return _Panel(
+      title: 'Unlisted in patches',
+      child: InkWell(
+        onTap: onTap,
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Doctors and chemists met off the list, by patch',
+                style: text.bodyMedium?.copyWith(color: p.inkMuted),
+              ),
+            ),
+            Icon(Iconsax.arrow_right_3, size: 16, color: p.inkMuted),
+          ],
+        ),
+      ),
     );
   }
 }

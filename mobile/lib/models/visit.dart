@@ -1,5 +1,3 @@
-import 'package:flutter/material.dart';
-
 import 'contact.dart';
 
 /// A product a visit promoted.
@@ -20,10 +18,12 @@ class VisitRecord {
     required this.userId,
     required this.repName,
     required this.visitDate,
-    required this.visitTime,
+    this.visitTime,
+    required this.dayPart,
     required this.status,
     required this.remarks,
-    required this.contactId,
+    this.contactId,
+    this.unlistedContactId,
     required this.contactName,
     required this.categoryName,
     this.typeName,
@@ -42,10 +42,12 @@ class VisitRecord {
     userId: json['user_id'] as int,
     repName: json['rep_name'] as String,
     visitDate: DateTime.parse(json['visit_date'] as String),
-    visitTime: json['visit_time'] as String,
+    visitTime: json['visit_time'] as String?,
+    dayPart: json['day_part'] as String,
     status: json['status'] as String,
     remarks: json['remarks'] as String,
-    contactId: json['contact_id'] as int,
+    contactId: json['contact_id'] as int?,
+    unlistedContactId: json['unlisted_contact_id'] as int?,
     contactName: json['contact_name'] as String,
     categoryName: json['category_name'] as String,
     typeName: json['type_name'] as String?,
@@ -67,13 +69,21 @@ class VisitRecord {
   final String repName;
   final DateTime visitDate;
 
-  /// The time as the server sends it, "HH:MM:SS".
-  final String visitTime;
+  /// The clock time as the server sends it, "HH:MM:SS". Null for a call logged by part of the day.
+  final String? visitTime;
+
+  /// morning, afternoon or evening.
+  final String dayPart;
 
   /// open until the day ends, then completed; disputed when a joint call was refused.
   final String status;
   final String remarks;
-  final int contactId;
+
+  /// Set for a call on a listed contact. Null for a call on an unlisted doctor or chemist.
+  final int? contactId;
+
+  /// Set for a call on an unlisted doctor or chemist of the patch. Null for a listed contact.
+  final int? unlistedContactId;
   final String contactName;
   final String categoryName;
   final String? typeName;
@@ -88,13 +98,9 @@ class VisitRecord {
   final String? partnerStatus;
   final bool isEditable;
 
-  TimeOfDay get time {
-    final parts = visitTime.split(':');
-    return TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
-  }
-
   Contact get contact => Contact(
-    id: contactId,
+    id: unlistedContactId ?? contactId!,
+    isUnlisted: unlistedContactId != null,
     name: contactName,
     categoryName: categoryName,
     typeName: typeName,
@@ -145,7 +151,8 @@ class JointRequest {
     required this.visitId,
     required this.initiatorUserId,
     required this.visitDate,
-    required this.visitTime,
+    this.visitTime,
+    required this.dayPart,
     required this.contactName,
     required this.categoryName,
     this.typeName,
@@ -161,7 +168,8 @@ class JointRequest {
     visitId: json['visit_id'] as int,
     initiatorUserId: json['initiator_user_id'] as int,
     visitDate: DateTime.parse(json['visit_date'] as String),
-    visitTime: json['visit_time'] as String,
+    visitTime: json['visit_time'] as String?,
+    dayPart: json['day_part'] as String,
     contactName: json['contact_name'] as String,
     categoryName: json['category_name'] as String,
     typeName: json['type_name'] as String?,
@@ -179,7 +187,8 @@ class JointRequest {
   final int visitId;
   final int initiatorUserId;
   final DateTime visitDate;
-  final String visitTime;
+  final String? visitTime;
+  final String dayPart;
   final String contactName;
   final String categoryName;
   final String? typeName;

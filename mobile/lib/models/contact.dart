@@ -12,6 +12,7 @@ class Contact {
     required this.subzoneId,
     required this.subzoneName,
     required this.isActive,
+    this.isUnlisted = false,
   });
 
   factory Contact.fromJson(Map<String, Object?> json) => Contact(
@@ -41,6 +42,9 @@ class Contact {
   final int subzoneId;
   final String subzoneName;
   final bool isActive;
+
+  /// True when [id] is an unlisted doctor or chemist's id rather than a listed contact's.
+  final bool isUnlisted;
 }
 
 /// How a contact is labelled on screen: its category, then its type when it has one.
